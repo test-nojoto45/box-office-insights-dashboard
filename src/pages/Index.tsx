@@ -18,6 +18,16 @@ import AlertModal from "@/components/AlertModal";
 import { format } from "date-fns";
 import { mockData } from "@/data/mockData";
 
+// Define type for the summary data
+interface PaymentGatewaySummary {
+  totalTransactions: number;
+  successCount: number;
+  failureCount: number;
+  refundCount: number;
+  totalVolume: number;
+  refundVolume: number;
+}
+
 const Index = () => {
   // State for filters
   const [dateRange, setDateRange] = useState({
@@ -112,7 +122,7 @@ const Index = () => {
     .reduce((sum, item) => sum + item.amount, 0);
 
   // Prepare summary data
-  const pgSummary = {};
+  const pgSummary: Record<string, PaymentGatewaySummary> = {};
   filteredData.forEach(item => {
     const pg = item.paymentGateway;
     if (!pgSummary[pg]) {
@@ -174,7 +184,7 @@ const Index = () => {
       {/* Filters Section */}
       <Card className="p-4">
         <div className="flex flex-col space-y-4">
-          <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex flex-wrap justify-end gap-4 items-end">
             {/* Date Range */}
             <div className="space-y-2">
               <Label>Date Range</Label>
@@ -225,7 +235,7 @@ const Index = () => {
             <Collapsible 
               open={showAllFilters} 
               onOpenChange={setShowAllFilters}
-              className="w-full"
+              className="w-auto"
             >
               <div className="flex items-center gap-4">
                 <CollapsibleTrigger asChild>
@@ -236,7 +246,6 @@ const Index = () => {
                 
                 <Button 
                   variant="outline" 
-                  className="ml-auto"
                   onClick={resetFilters}
                 >
                   Reset Filters
@@ -287,13 +296,6 @@ const Index = () => {
                     </SheetFooter>
                   </SheetContent>
                 </Sheet>
-                
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowAlertModal(true)}
-                >
-                  Configure Alerts
-                </Button>
               </div>
               
               <CollapsibleContent className="space-y-4 mt-4">
@@ -444,23 +446,25 @@ const Index = () => {
       
       {/* Chart Section */}
       <Card className="p-4">
-        <div className="mb-4 flex flex-wrap justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <Tabs defaultValue={viewType} onValueChange={setViewType} className="w-[400px]">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="gateway">Payment Gateway</TabsTrigger>
-                <TabsTrigger value="method">Payment Method</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-          
-          <div>
-            <Tabs defaultValue={chartMetric} onValueChange={setChartMetric} className="w-[400px]">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="volume">Volume Processed</TabsTrigger>
-                <TabsTrigger value="success">Success Percentage</TabsTrigger>
-              </TabsList>
-            </Tabs>
+        <div className="mb-4">
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <Tabs defaultValue={viewType} onValueChange={setViewType} className="w-[400px]">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="gateway">Payment Gateway</TabsTrigger>
+                  <TabsTrigger value="method">Payment Method</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            
+            <div className="flex items-start justify-start pl-1">
+              <Tabs defaultValue={chartMetric} onValueChange={setChartMetric} className="w-[400px]">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="volume">Volume Processed</TabsTrigger>
+                  <TabsTrigger value="success">Success Percentage</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
         </div>
         
@@ -470,6 +474,15 @@ const Index = () => {
             viewType={viewType} 
             chartMetric={chartMetric} 
           />
+        </div>
+        
+        <div className="mt-4 flex justify-end">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowAlertModal(true)}
+          >
+            Configure Alerts
+          </Button>
         </div>
       </Card>
       
