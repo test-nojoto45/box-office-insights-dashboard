@@ -17,9 +17,10 @@ import PaymentBarChart from "@/components/PaymentBarChart";
 import AlertModal from "@/components/AlertModal";
 import { format } from "date-fns";
 import { mockData } from "@/data/mockData";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // Define type for the summary data
-interface PaymentGatewaySummary {
+interface PaymentSummary {
   totalTransactions: number;
   successCount: number;
   failureCount: number;
@@ -122,30 +123,41 @@ const Index = () => {
     .reduce((sum, item) => sum + item.amount, 0);
 
   // Prepare summary data
-  const pgSummary: Record<string, PaymentGatewaySummary> = {};
-  filteredData.forEach(item => {
-    const pg = item.paymentGateway;
-    if (!pgSummary[pg]) {
-      pgSummary[pg] = {
-        totalTransactions: 0,
-        successCount: 0,
-        failureCount: 0,
-        refundCount: 0,
-        totalVolume: 0,
-        refundVolume: 0
-      };
-    }
+  const prepareSummaryData = () => {
+    const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
     
-    pgSummary[pg].totalTransactions += 1;
-    pgSummary[pg].totalVolume += item.amount;
+    // Create a summary object based on the view type (gateway or method)
+    const summary: Record<string, PaymentSummary> = {};
     
-    if (item.status === "success") pgSummary[pg].successCount += 1;
-    if (item.status === "failure") pgSummary[pg].failureCount += 1;
-    if (item.isRefunded) {
-      pgSummary[pg].refundCount += 1;
-      pgSummary[pg].refundVolume += item.amount;
-    }
-  });
+    filteredData.forEach(item => {
+      const key = item[groupBy];
+      if (!summary[key]) {
+        summary[key] = {
+          totalTransactions: 0,
+          successCount: 0,
+          failureCount: 0,
+          refundCount: 0,
+          totalVolume: 0,
+          refundVolume: 0
+        };
+      }
+      
+      summary[key].totalTransactions += 1;
+      summary[key].totalVolume += item.amount;
+      
+      if (item.status === "success") summary[key].successCount += 1;
+      if (item.status === "failure") summary[key].failureCount += 1;
+      if (item.isRefunded) {
+        summary[key].refundCount += 1;
+        summary[key].refundVolume += item.amount;
+      }
+    });
+    
+    return summary;
+  };
+  
+  // Get summary data based on current view type
+  const summaryData = prepareSummaryData();
 
   // Helper functions
   const handleExport = () => {
@@ -325,10 +337,10 @@ const Index = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Gateways</SelectItem>
-                        <SelectItem value="razorpay">Razorpay</SelectItem>
-                        <SelectItem value="payu">PayU</SelectItem>
-                        <SelectItem value="stripe">Stripe</SelectItem>
-                        <SelectItem value="paypal">PayPal</SelectItem>
+                        <SelectItem value="Razorpay">Razorpay</SelectItem>
+                        <SelectItem value="PayU">PayU</SelectItem>
+                        <SelectItem value="Stripe">Stripe</SelectItem>
+                        <SelectItem value="PayPal">PayPal</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -449,7 +461,7 @@ const Index = () => {
         <div className="mb-4">
           <div className="flex flex-col space-y-4">
             <div className="flex items-center justify-between">
-              <Tabs defaultValue={viewType} onValueChange={setViewType} className="w-[400px]">
+              <Tabs defaultValue="gateway" onValueChange={setViewType} className="w-[400px]">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="gateway">Payment Gateway</TabsTrigger>
                   <TabsTrigger value="method">Payment Method</TabsTrigger>
@@ -488,40 +500,42 @@ const Index = () => {
       
       {/* Summary Table */}
       <Card className="p-4">
-        <h2 className="text-xl font-bold mb-4">Summary Table</h2>
+        <h2 className="text-xl font-bold mb-4">
+          {viewType === "gateway" ? "Payment Gateway Summary" : "Payment Method Summary"}
+        </h2>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-2">Payment Gateway</th>
-                <th className="text-left p-2">Total Transactions</th>
-                <th className="text-left p-2">Total Volume</th>
-                <th className="text-left p-2">Success%</th>
-                <th className="text-left p-2">Failure%</th>
-                <th className="text-left p-2">Total Amount Refunded</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(pgSummary).map(([pg, data]) => (
-                <tr key={pg} className="border-b hover:bg-slate-50">
-                  <td className="p-2">{pg}</td>
-                  <td className="p-2">{data.totalTransactions}</td>
-                  <td className="p-2">{formatCurrency(data.totalVolume)}</td>
-                  <td className="p-2">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{viewType === "gateway" ? "Payment Gateway" : "Payment Method"}</TableHead>
+                <TableHead>Total Transactions</TableHead>
+                <TableHead>Total Volume</TableHead>
+                <TableHead>Success%</TableHead>
+                <TableHead>Failure%</TableHead>
+                <TableHead>Total Amount Refunded</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Object.entries(summaryData).map(([key, data]) => (
+                <TableRow key={key}>
+                  <TableCell className="font-medium">{key}</TableCell>
+                  <TableCell>{data.totalTransactions}</TableCell>
+                  <TableCell>{formatCurrency(data.totalVolume)}</TableCell>
+                  <TableCell>
                     {data.totalTransactions > 0 
                       ? ((data.successCount / data.totalTransactions) * 100).toFixed(1) 
                       : 0}%
-                  </td>
-                  <td className="p-2">
+                  </TableCell>
+                  <TableCell>
                     {data.totalTransactions > 0 
                       ? ((data.failureCount / data.totalTransactions) * 100).toFixed(1) 
                       : 0}%
-                  </td>
-                  <td className="p-2">{formatCurrency(data.refundVolume)}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell>{formatCurrency(data.refundVolume)}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </Card>
       
