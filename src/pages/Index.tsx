@@ -43,7 +43,8 @@ const Index = () => {
   const [emiType, setEmiType] = useState("all");
   const [paymentStatus, setPaymentStatus] = useState("all");
   
-  // State for chart metric
+  // State for view toggle
+  const [viewType, setViewType] = useState("gateway"); // "gateway" or "method"
   const [chartMetric, setChartMetric] = useState("volume"); // "volume" or "success"
 
   // State for alerts modal
@@ -446,21 +447,31 @@ const Index = () => {
       {/* Chart Section */}
       <Card className="p-4">
         <div className="mb-4">
-          <p className="text-lg font-semibold mb-4">Payment Gateway Analysis</p>
-          
-          <div className="flex items-start justify-start pl-1">
-            <Tabs defaultValue={chartMetric} onValueChange={setChartMetric} className="w-[400px]">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="volume">Volume Processed</TabsTrigger>
-                <TabsTrigger value="success">Success Percentage</TabsTrigger>
-              </TabsList>
-            </Tabs>
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <Tabs defaultValue={viewType} onValueChange={setViewType} className="w-[400px]">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="gateway">Payment Gateway</TabsTrigger>
+                  <TabsTrigger value="method">Payment Method</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            
+            <div className="flex items-start justify-start pl-1">
+              <Tabs defaultValue={chartMetric} onValueChange={setChartMetric} className="w-[400px]">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="volume">Volume Processed</TabsTrigger>
+                  <TabsTrigger value="success">Success Percentage</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
         </div>
         
         <div className="h-[400px]">
           <PaymentBarChart 
             data={filteredData} 
+            viewType={viewType} 
             chartMetric={chartMetric} 
           />
         </div>

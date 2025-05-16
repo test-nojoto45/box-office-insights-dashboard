@@ -4,69 +4,43 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 
 interface PaymentBarChartProps {
   data: any[];
+  viewType: string;
   chartMetric: string;
 }
 
-const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, chartMetric }) => {
+const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chartMetric }) => {
   const chartData = useMemo(() => {
-    // First group data by payment gateway
-    const gatewayGroups = data.reduce((acc, item) => {
-      const gateway = item.paymentGateway;
+    // Group data by gateway or method
+    const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
+    
+    const groupedData = data.reduce((acc, item) => {
+      const key = item[groupBy];
       
-      if (!acc[gateway]) {
-        acc[gateway] = {
-          name: gateway,
-          methods: {},
-          totalAmount: 0,
-          totalCount: 0,
-          successCount: 0
-        };
-      }
-      
-      // Then group by payment method within each gateway
-      const methodKey = item.paymentMethod;
-      if (!acc[gateway].methods[methodKey]) {
-        acc[gateway].methods[methodKey] = {
-          name: methodKey,
+      if (!acc[key]) {
+        acc[key] = {
+          name: key,
           totalAmount: 0,
           successCount: 0,
-          totalCount: 0
+          totalCount: 0,
         };
       }
       
-      // Update gateway level counts
-      acc[gateway].totalAmount += item.amount;
-      acc[gateway].totalCount += 1;
+      acc[key].totalAmount += item.amount;
+      acc[key].totalCount += 1;
       if (item.status === "success") {
-        acc[gateway].successCount += 1;
-      }
-      
-      // Update method level counts
-      acc[gateway].methods[methodKey].totalAmount += item.amount;
-      acc[gateway].methods[methodKey].totalCount += 1;
-      if (item.status === "success") {
-        acc[gateway].methods[methodKey].successCount += 1;
+        acc[key].successCount += 1;
       }
       
       return acc;
     }, {});
     
-    // Convert to array with nested data structure for the chart
-    return Object.values(gatewayGroups).map((gateway: any) => {
-      const methods = Object.values(gateway.methods).map((method: any) => ({
-        name: method.name,
-        volume: method.totalAmount,
-        successRate: method.totalCount > 0 ? (method.successCount / method.totalCount) * 100 : 0,
-      }));
-      
-      return {
-        name: gateway.name,
-        volume: gateway.totalAmount,
-        successRate: gateway.totalCount > 0 ? (gateway.successCount / gateway.totalCount) * 100 : 0,
-        methods: methods
-      };
-    });
-  }, [data]);
+    // Convert to array and calculate percentages
+    return Object.values(groupedData).map((group: any) => ({
+      name: group.name,
+      volume: group.totalAmount,
+      successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
+    }));
+  }, [data, viewType]);
 
   // Determine what to display based on chartMetric
   const dataKey = chartMetric === "volume" ? "volume" : "successRate";
@@ -84,38 +58,6 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, chartMetric }) 
     } else {
       return `${value.toFixed(1)}%`;
     }
-  };
-
-  // Custom tooltip to show payment method breakdown
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const gatewayData = chartData.find(g => g.name === label);
-      
-      return (
-        <div className="bg-white p-4 border rounded shadow-md">
-          <p className="font-bold">{label}</p>
-          <p className="text-gray-600">
-            {chartMetric === "volume" ? "Total Volume: " : "Success Rate: "}
-            <span className="font-medium">
-              {formatTooltip(payload[0].value)}
-            </span>
-          </p>
-          
-          <div className="mt-2">
-            <p className="font-bold text-sm">Payment Methods:</p>
-            <ul className="mt-1 space-y-1">
-              {gatewayData?.methods.map((method: any, idx: number) => (
-                <li key={idx} className="text-xs flex justify-between">
-                  <span>{method.name}</span>
-                  <span className="ml-4 font-medium">{formatTooltip(method[dataKey])}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      );
-    }
-    return null;
   };
 
   return (
@@ -138,7 +80,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, chartMetric }) 
             position: "insideLeft" 
           }} 
         />
-        <Tooltip content={<CustomTooltip />} />
+        <Tooltip formatter={(value: number) => formatTooltip(value)} />
         <Legend />
         <Bar 
           dataKey={dataKey} 
