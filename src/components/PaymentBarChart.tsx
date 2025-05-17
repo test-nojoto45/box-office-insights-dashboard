@@ -36,11 +36,23 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chart
     
     // Convert to array and calculate percentages
     return Object.values(groupedData).map((group: any) => ({
-      name: group.name,
+      name: viewType === "method" ? formatMethodName(group.name) : group.name,
       volume: group.totalAmount,
       successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
     }));
   }, [data, viewType]);
+
+  // Format payment method names for display
+  const formatMethodName = (method: string) => {
+    switch (method) {
+      case "creditCard": return "Credit Card";
+      case "debitCard": return "Debit Card";
+      case "netBanking": return "Net Banking";
+      case "upi": return "UPI";
+      case "wallet": return "Wallet";
+      default: return method;
+    }
+  };
 
   // Determine what to display based on chartMetric
   const dataKey = chartMetric === "volume" ? "volume" : "successRate";
