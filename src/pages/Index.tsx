@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { Download, ChevronDown, Plus, X } from "lucide-react";
+import { Download, ChevronDown, Plus, X, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,7 @@ import AlertModal from "@/components/AlertModal";
 import { format } from "date-fns";
 import { mockData } from "@/data/mockData";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 // Define type for the summary data
 interface PaymentSummary {
@@ -35,14 +36,16 @@ const Index = () => {
     from: new Date(2024, 4, 1),
     to: new Date()
   });
-  const [selectedLob, setSelectedLob] = useState("all");
-  const [showAllFilters, setShowAllFilters] = useState(false);
-  const [businessType, setBusinessType] = useState("all");
-  const [paymentGateway, setPaymentGateway] = useState("all");
-  const [bank, setBank] = useState("all");
-  const [paymentMethod, setPaymentMethod] = useState("all");
-  const [emiType, setEmiType] = useState("all");
-  const [paymentStatus, setPaymentStatus] = useState("all");
+  
+  // Replace selectedLob with businessTypes (multi-select)
+  const [businessTypes, setBusinessTypes] = useState<string[]>([]);
+  
+  // Convert other filters to multi-select
+  const [paymentGateways, setPaymentGateways] = useState<string[]>([]);
+  const [banks, setBanks] = useState<string[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
+  const [emiTypes, setEmiTypes] = useState<string[]>([]);
+  const [paymentStatuses, setPaymentStatuses] = useState<string[]>([]);
   
   // State for view toggle
   const [viewType, setViewType] = useState("gateway"); // "gateway" or "method"
@@ -66,38 +69,26 @@ const Index = () => {
   // Filtered data based on current filters
   const [filteredData, setFilteredData] = useState(mockData);
 
+  // Helper function to check if an array includes a value or is empty
+  const includesOrEmpty = (arr: string[], value: string) => {
+    return arr.length === 0 || arr.includes(value);
+  };
+
   // Apply filters and update filtered data
   useEffect(() => {
     let filtered = [...mockData];
     
-    // Apply each filter
-    if (selectedLob !== "all") {
-      filtered = filtered.filter(item => item.lob === selectedLob);
-    }
-
-    if (businessType !== "all") {
-      filtered = filtered.filter(item => item.businessType === businessType);
-    }
-
-    if (paymentGateway !== "all") {
-      filtered = filtered.filter(item => item.paymentGateway === paymentGateway);
-    }
-
-    if (bank !== "all") {
-      filtered = filtered.filter(item => item.bank === bank);
-    }
-
-    if (paymentMethod !== "all") {
-      filtered = filtered.filter(item => item.paymentMethod === paymentMethod);
-    }
-
-    if (emiType !== "all") {
-      filtered = filtered.filter(item => item.emiType === emiType);
-    }
-
-    if (paymentStatus !== "all") {
-      filtered = filtered.filter(item => item.status === paymentStatus);
-    }
+    // Apply each filter with multi-select logic
+    filtered = filtered.filter(item => {
+      return (
+        includesOrEmpty(businessTypes, item.businessType) &&
+        includesOrEmpty(paymentGateways, item.paymentGateway) &&
+        includesOrEmpty(banks, item.bank) &&
+        includesOrEmpty(paymentMethods, item.paymentMethod) &&
+        includesOrEmpty(emiTypes, item.emiType) &&
+        includesOrEmpty(paymentStatuses, item.status)
+      );
+    });
 
     // Apply date range filter
     filtered = filtered.filter(item => {
@@ -106,7 +97,7 @@ const Index = () => {
     });
     
     setFilteredData(filtered);
-  }, [selectedLob, businessType, paymentGateway, bank, paymentMethod, emiType, paymentStatus, dateRange]);
+  }, [businessTypes, paymentGateways, banks, paymentMethods, emiTypes, paymentStatuses, dateRange]);
 
   // Calculate metrics
   const totalVolume = filteredData.reduce((sum, item) => sum + item.amount, 0);
@@ -159,24 +150,24 @@ const Index = () => {
   // Get summary data based on current view type
   const summaryData = prepareSummaryData();
 
-  // Helper functions
-  const handleExport = () => {
-    toast.success("Export initiated! File will be downloaded shortly.");
-  };
-
+  // Reset filters function
   const resetFilters = () => {
-    setSelectedLob("all");
-    setBusinessType("all");
-    setPaymentGateway("all");
-    setBank("all");
-    setPaymentMethod("all");
-    setEmiType("all");
-    setPaymentStatus("all");
+    setBusinessTypes([]);
+    setPaymentGateways([]);
+    setBanks([]);
+    setPaymentMethods([]);
+    setEmiTypes([]);
+    setPaymentStatuses([]);
     setDateRange({
       from: new Date(2024, 4, 1),
       to: new Date()
     });
     toast.success("Filters have been reset!");
+  };
+
+  // Helper functions
+  const handleExport = () => {
+    toast.success("Export initiated! File will be downloaded shortly.");
   };
 
   const formatCurrency = (amount) => {
@@ -187,6 +178,14 @@ const Index = () => {
     } else {
       return `₹${amount.toFixed(2)}`;
     }
+  };
+
+  // Helper function for handling checkbox toggles in filter lists
+  const handleCheckboxToggle = (value: string, currentItems: string[], setItems: React.Dispatch<React.SetStateAction<string[]>>) => {
+    const updatedItems = currentItems.includes(value)
+      ? currentItems.filter(item => item !== value)
+      : [...currentItems, value];
+    setItems(updatedItems);
   };
 
   return (
@@ -226,197 +225,231 @@ const Index = () => {
               </Popover>
             </div>
 
-            {/* LOB Filter */}
+            {/* Business Type Filter - Replacing LOB */}
             <div className="space-y-2">
-              <Label>Line of Business</Label>
-              <Select value={selectedLob} onValueChange={setSelectedLob}>
+              <Label>Business Type</Label>
+              <Select>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select LOB" />
+                  <SelectValue placeholder={businessTypes.length === 0 
+                    ? "All Types" 
+                    : `${businessTypes.length} selected`} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All LOBs</SelectItem>
-                  <SelectItem value="movies">Movies</SelectItem>
-                  <SelectItem value="events">Events</SelectItem>
-                  <SelectItem value="activities">Activities</SelectItem>
-                  <SelectItem value="sports">Sports</SelectItem>
+                  <div className="space-y-2 p-2">
+                    {["b2c", "b2b", "corporate"].map((type) => (
+                      <div key={type} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`business-${type}`}
+                          checked={businessTypes.includes(type)}
+                          onCheckedChange={() => handleCheckboxToggle(type, businessTypes, setBusinessTypes)}
+                        />
+                        <label htmlFor={`business-${type}`} className="text-sm font-medium leading-none cursor-pointer">
+                          {type.toUpperCase()}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* All Filters Button */}
-            <Collapsible 
-              open={showAllFilters} 
-              onOpenChange={setShowAllFilters}
-              className="w-auto"
-            >
-              <div className="flex items-center gap-4">
-                <CollapsibleTrigger asChild>
-                  <Button variant="outline">
-                    All Filters {showAllFilters ? <ChevronDown className="h-4 w-4 rotate-180 transition-all" /> : <ChevronDown className="h-4 w-4 transition-all" />}
-                  </Button>
-                </CollapsibleTrigger>
-                
-                <Button 
-                  variant="outline" 
-                  onClick={resetFilters}
-                >
-                  Reset Filters
+            {/* All Filters Button - Now opens a Dialog */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" /> All Filters
                 </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Filter Options</DialogTitle>
+                  <DialogDescription>
+                    Select multiple filters to refine your payment data
+                  </DialogDescription>
+                </DialogHeader>
                 
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button className="flex items-center gap-2">
-                      <Download className="h-4 w-4" />
-                      Export
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent>
-                    <SheetHeader>
-                      <SheetTitle>Export Data</SheetTitle>
-                      <SheetDescription>
-                        Select the fields you want to include in your export
-                      </SheetDescription>
-                    </SheetHeader>
-                    <div className="py-6 space-y-4">
-                      <div className="grid grid-cols-1 gap-4">
-                        {Object.entries(selectedExportFields).map(([field, isSelected]) => (
-                          <div className="flex items-center space-x-2" key={field}>
-                            <Checkbox 
-                              id={field} 
-                              checked={isSelected}
-                              onCheckedChange={(checked) => 
-                                setSelectedExportFields(prev => ({
-                                  ...prev,
-                                  [field]: checked === true
-                                }))
-                              }
-                            />
-                            <label
-                              htmlFor={field}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              {field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <SheetFooter>
-                      <SheetClose asChild>
-                        <Button onClick={handleExport}>Download CSV</Button>
-                      </SheetClose>
-                    </SheetFooter>
-                  </SheetContent>
-                </Sheet>
-              </div>
-              
-              <CollapsibleContent className="space-y-4 mt-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-4">
                   {/* Business Type */}
-                  <div className="space-y-2">
-                    <Label>Business Type</Label>
-                    <Select value={businessType} onValueChange={setBusinessType}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Business Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="b2c">B2C</SelectItem>
-                        <SelectItem value="b2b">B2B</SelectItem>
-                        <SelectItem value="corporate">Corporate</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Business Type</Label>
+                    <div className="space-y-2">
+                      {["b2c", "b2b", "corporate"].map((type) => (
+                        <div key={type} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`dialog-business-${type}`}
+                            checked={businessTypes.includes(type)}
+                            onCheckedChange={() => handleCheckboxToggle(type, businessTypes, setBusinessTypes)}
+                          />
+                          <label htmlFor={`dialog-business-${type}`} className="text-sm leading-none cursor-pointer">
+                            {type.toUpperCase()}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   
                   {/* Payment Gateway */}
-                  <div className="space-y-2">
-                    <Label>Payment Gateway</Label>
-                    <Select value={paymentGateway} onValueChange={setPaymentGateway}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Payment Gateway" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Gateways</SelectItem>
-                        <SelectItem value="Razorpay">Razorpay</SelectItem>
-                        <SelectItem value="PayU">PayU</SelectItem>
-                        <SelectItem value="Stripe">Stripe</SelectItem>
-                        <SelectItem value="PayPal">PayPal</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Payment Gateway</Label>
+                    <div className="space-y-2">
+                      {["Razorpay", "PayU", "Stripe", "PayPal"].map((gateway) => (
+                        <div key={gateway} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`dialog-gateway-${gateway}`}
+                            checked={paymentGateways.includes(gateway)}
+                            onCheckedChange={() => handleCheckboxToggle(gateway, paymentGateways, setPaymentGateways)}
+                          />
+                          <label htmlFor={`dialog-gateway-${gateway}`} className="text-sm leading-none cursor-pointer">
+                            {gateway}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   
                   {/* Bank */}
-                  <div className="space-y-2">
-                    <Label>Bank</Label>
-                    <Select value={bank} onValueChange={setBank}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Bank" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Banks</SelectItem>
-                        <SelectItem value="hdfc">HDFC</SelectItem>
-                        <SelectItem value="icici">ICICI</SelectItem>
-                        <SelectItem value="sbi">SBI</SelectItem>
-                        <SelectItem value="axis">Axis</SelectItem>
-                        <SelectItem value="kotak">Kotak</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Bank</Label>
+                    <div className="space-y-2">
+                      {["hdfc", "icici", "sbi", "axis", "kotak"].map((bank) => (
+                        <div key={bank} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`dialog-bank-${bank}`}
+                            checked={banks.includes(bank)}
+                            onCheckedChange={() => handleCheckboxToggle(bank, banks, setBanks)}
+                          />
+                          <label htmlFor={`dialog-bank-${bank}`} className="text-sm leading-none cursor-pointer">
+                            {bank.toUpperCase()}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   
                   {/* Payment Method */}
-                  <div className="space-y-2">
-                    <Label>Payment Method</Label>
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Payment Method" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Methods</SelectItem>
-                        <SelectItem value="creditCard">Credit Card</SelectItem>
-                        <SelectItem value="debitCard">Debit Card</SelectItem>
-                        <SelectItem value="netBanking">Net Banking</SelectItem>
-                        <SelectItem value="upi">UPI</SelectItem>
-                        <SelectItem value="wallet">Wallet</SelectItem>
-                        <SelectItem value="emi">EMI</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Payment Method</Label>
+                    <div className="space-y-2">
+                      {["creditCard", "debitCard", "netBanking", "upi", "wallet", "emi"].map((method) => (
+                        <div key={method} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`dialog-method-${method}`}
+                            checked={paymentMethods.includes(method)}
+                            onCheckedChange={() => handleCheckboxToggle(method, paymentMethods, setPaymentMethods)}
+                          />
+                          <label htmlFor={`dialog-method-${method}`} className="text-sm leading-none cursor-pointer">
+                            {method === "creditCard" ? "Credit Card" :
+                             method === "debitCard" ? "Debit Card" :
+                             method === "netBanking" ? "Net Banking" :
+                             method === "upi" ? "UPI" :
+                             method === "wallet" ? "Wallet" : "EMI"}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   
                   {/* EMI Type */}
-                  <div className="space-y-2">
-                    <Label>EMI Type</Label>
-                    <Select value={emiType} onValueChange={setEmiType}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select EMI Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All EMI Types</SelectItem>
-                        <SelectItem value="3months">3 Months</SelectItem>
-                        <SelectItem value="6months">6 Months</SelectItem>
-                        <SelectItem value="9months">9 Months</SelectItem>
-                        <SelectItem value="12months">12 Months</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">EMI Type</Label>
+                    <div className="space-y-2">
+                      {["3months", "6months", "9months", "12months"].map((emi) => (
+                        <div key={emi} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`dialog-emi-${emi}`}
+                            checked={emiTypes.includes(emi)}
+                            onCheckedChange={() => handleCheckboxToggle(emi, emiTypes, setEmiTypes)}
+                          />
+                          <label htmlFor={`dialog-emi-${emi}`} className="text-sm leading-none cursor-pointer">
+                            {emi}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   
                   {/* Payment Status */}
-                  <div className="space-y-2">
-                    <Label>Payment Status</Label>
-                    <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Payment Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="success">Success</SelectItem>
-                        <SelectItem value="failure">Failure</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Payment Status</Label>
+                    <div className="space-y-2">
+                      {["success", "failure", "pending"].map((status) => (
+                        <div key={status} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`dialog-status-${status}`}
+                            checked={paymentStatuses.includes(status)}
+                            onCheckedChange={() => handleCheckboxToggle(status, paymentStatuses, setPaymentStatuses)}
+                          />
+                          <label htmlFor={`dialog-status-${status}`} className="text-sm leading-none cursor-pointer capitalize">
+                            {status}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+                <div className="flex justify-end space-x-4 mt-4">
+                  <Button variant="outline" onClick={resetFilters}>
+                    Reset Filters
+                  </Button>
+                  <DialogTrigger asChild>
+                    <Button>Apply Filters</Button>
+                  </DialogTrigger>
+                </div>
+              </DialogContent>
+            </Dialog>
+                
+            <Button 
+              variant="outline" 
+              onClick={resetFilters}
+            >
+              Reset Filters
+            </Button>
+            
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button className="flex items-center gap-2">
+                  <Download className="h-4 w-4" />
+                  Export
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Export Data</SheetTitle>
+                  <SheetDescription>
+                    Select the fields you want to include in your export
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="py-6 space-y-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    {Object.entries(selectedExportFields).map(([field, isSelected]) => (
+                      <div className="flex items-center space-x-2" key={field}>
+                        <Checkbox 
+                          id={field} 
+                          checked={isSelected}
+                          onCheckedChange={(checked) => 
+                            setSelectedExportFields(prev => ({
+                              ...prev,
+                              [field]: checked === true
+                            }))
+                          }
+                        />
+                        <label
+                          htmlFor={field}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <SheetFooter>
+                  <SheetClose asChild>
+                    <Button onClick={handleExport}>Download CSV</Button>
+                  </SheetClose>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </Card>
