@@ -436,7 +436,7 @@ const Index = () => {
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Method</Label>
                     <div className="space-y-2">
-                      {["creditCard", "debitCard", "netBanking", "upi", "wallet", "emi"].map((method) => (
+                      {["creditCard", "debitCard", "netBanking", "upi", "wallet", "shopse"].map((method) => (
                         <div key={method} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`dialog-method-${method}`}
@@ -448,7 +448,8 @@ const Index = () => {
                              method === "debitCard" ? "Debit Card" :
                              method === "netBanking" ? "Net Banking" :
                              method === "upi" ? "UPI" :
-                             method === "wallet" ? "Wallet" : "EMI"}
+                             method === "wallet" ? "Wallet" :
+                             method === "shopse" ? "Shopse" : method}
                           </label>
                         </div>
                       ))}
