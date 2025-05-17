@@ -9,6 +9,18 @@ interface PaymentBarChartProps {
 }
 
 const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chartMetric }) => {
+  // Format payment method names for display - moved up before it's used
+  const formatMethodName = (method: string) => {
+    switch (method) {
+      case "creditCard": return "Credit Card";
+      case "debitCard": return "Debit Card";
+      case "netBanking": return "Net Banking";
+      case "upi": return "UPI";
+      case "wallet": return "Wallet";
+      default: return method;
+    }
+  };
+
   const chartData = useMemo(() => {
     // Group data by gateway or method
     const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
@@ -41,18 +53,6 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chart
       successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
     }));
   }, [data, viewType]);
-
-  // Format payment method names for display
-  const formatMethodName = (method: string) => {
-    switch (method) {
-      case "creditCard": return "Credit Card";
-      case "debitCard": return "Debit Card";
-      case "netBanking": return "Net Banking";
-      case "upi": return "UPI";
-      case "wallet": return "Wallet";
-      default: return method;
-    }
-  };
 
   // Determine what to display based on chartMetric
   const dataKey = chartMetric === "volume" ? "volume" : "successRate";
