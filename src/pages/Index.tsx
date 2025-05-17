@@ -80,12 +80,24 @@ const Index = () => {
     
     // Apply each filter with multi-select logic
     filtered = filtered.filter(item => {
+      // Check if EMI types are selected and payment methods are compatible
+      const emiSelected = emiTypes.length > 0;
+      const cardMethodSelected = paymentMethods.includes("creditCard") || paymentMethods.includes("debitCard");
+      const isEmiCompatible = !emiSelected || 
+        ((item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard") && 
+         includesOrEmpty(emiTypes, item.emiType));
+      
+      // If EMI types are selected but no card payment methods are selected, filter out non-card items
+      if (emiSelected && !cardMethodSelected && item.paymentMethod !== "creditCard" && item.paymentMethod !== "debitCard") {
+        return false;
+      }
+      
       return (
         includesOrEmpty(businessTypes, item.businessType) &&
         includesOrEmpty(paymentGateways, item.paymentGateway) &&
         includesOrEmpty(banks, item.bank) &&
         includesOrEmpty(paymentMethods, item.paymentMethod) &&
-        includesOrEmpty(emiTypes, item.emiType) &&
+        isEmiCompatible &&
         includesOrEmpty(paymentStatuses, item.status)
       );
     });
@@ -149,6 +161,20 @@ const Index = () => {
   
   // Get summary data based on current view type
   const summaryData = prepareSummaryData();
+
+  // Helper function to handle EMI type selection
+  const handleEmiTypeToggle = (emiType: string) => {
+    // Check if we have credit or debit card in payment methods
+    const hasCardMethod = paymentMethods.includes("creditCard") || paymentMethods.includes("debitCard");
+    
+    // If EMI is being selected and no card payment method is selected, auto-select credit card
+    if (!hasCardMethod && !emiTypes.includes(emiType)) {
+      setPaymentMethods(prev => [...prev, "creditCard"]);
+    }
+    
+    // Toggle the EMI type
+    handleCheckboxToggle(emiType, emiTypes, setEmiTypes);
+  };
 
   // Reset filters function
   const resetFilters = () => {
@@ -349,22 +375,28 @@ const Index = () => {
                     </div>
                   </div>
                   
-                  {/* EMI Type */}
+                  {/* EMI Type - Updated options */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">EMI Type</Label>
                     <div className="space-y-2">
-                      {["3months", "6months", "9months", "12months"].map((emi) => (
+                      {["standard", "noCost"].map((emi) => (
                         <div key={emi} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`dialog-emi-${emi}`}
                             checked={emiTypes.includes(emi)}
-                            onCheckedChange={() => handleCheckboxToggle(emi, emiTypes, setEmiTypes)}
+                            onCheckedChange={() => handleEmiTypeToggle(emi)}
+                            disabled={paymentMethods.length > 0 && 
+                              !paymentMethods.includes("creditCard") && 
+                              !paymentMethods.includes("debitCard")}
                           />
                           <label htmlFor={`dialog-emi-${emi}`} className="text-sm leading-none cursor-pointer">
-                            {emi}
+                            {emi === "standard" ? "Standard" : "No Cost"}
                           </label>
                         </div>
                       ))}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        EMI types only apply to credit and debit cards
+                      </p>
                     </div>
                   </div>
                   
