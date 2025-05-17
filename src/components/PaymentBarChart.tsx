@@ -1,12 +1,19 @@
 
 import React, { useMemo } from "react";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps } from "recharts";
 
 interface PaymentBarChartProps {
   data: any[];
   viewType: string;
   chartMetric: string;
   emiTypes?: string[]; // Add emiTypes as an optional prop
+}
+
+// Define CustomTooltipProps interface to fix the TypeScript error
+interface CustomTooltipProps extends TooltipProps<any, any> {
+  active?: boolean;
+  payload?: any[];
+  label?: any;
 }
 
 const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chartMetric, emiTypes = [] }) => {
@@ -130,8 +137,8 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chart
     }
   };
 
-  // Custom tooltip that shows EMI type if available
-  const CustomTooltip = ({ active, payload, label }) => {
+  // Custom tooltip that shows EMI type if available - fixed with proper type definition
+  const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-background border border-border p-3 rounded shadow-lg">
