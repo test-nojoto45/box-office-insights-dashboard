@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Download, ChevronDown, Plus, X, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -28,6 +27,7 @@ interface PaymentSummary {
   refundCount: number;
   totalVolume: number;
   refundVolume: number;
+  emiType?: string; // Add emiType field to the summary
 }
 
 const Index = () => {
@@ -125,38 +125,118 @@ const Index = () => {
     .filter(item => item.isRefunded)
     .reduce((sum, item) => sum + item.amount, 0);
 
-  // Prepare summary data
+  // Format EMI type name for display
+  const formatEmiTypeName = (emiType: string) => {
+    switch (emiType) {
+      case "standard": return "Standard EMI";
+      case "noCost": return "No Cost EMI";
+      default: return "N/A";
+    }
+  };
+
+  // Modified to include EMI type in summary
   const prepareSummaryData = () => {
     const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
     
     // Create a summary object based on the view type (gateway or method)
-    const summary: Record<string, PaymentSummary> = {};
+    const summary: Record<string, PaymentSummary | Record<string, PaymentSummary>> = {};
     
-    filteredData.forEach(item => {
-      const key = item[groupBy];
-      if (!summary[key]) {
-        summary[key] = {
-          totalTransactions: 0,
-          successCount: 0,
-          failureCount: 0,
-          refundCount: 0,
-          totalVolume: 0,
-          refundVolume: 0
-        };
-      }
+    // Check if we need to group by EMI type
+    const shouldGroupByEmi = emiTypes.length > 0 && 
+      filteredData.some(item => 
+        (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard") && 
+        item.emiType && 
+        emiTypes.includes(item.emiType)
+      );
+
+    if (shouldGroupByEmi) {
+      // Group by payment method/gateway and then by EMI type
+      filteredData.forEach(item => {
+        const key = item[groupBy];
+        
+        // Skip non-card items if EMI types are selected
+        if (emiTypes.length > 0 && item.paymentMethod !== "creditCard" && item.paymentMethod !== "debitCard") {
+          return;
+        }
+        
+        // Skip items with no EMI type or not matching selected EMI types
+        if (emiTypes.length > 0 && (!item.emiType || !emiTypes.includes(item.emiType))) {
+          return;
+        }
+
+        if (!summary[key]) {
+          summary[key] = {};
+        }
+
+        const emiType = item.emiType || "none";
+        
+        if (!summary[key][emiType]) {
+          summary[key][emiType] = {
+            totalTransactions: 0,
+            successCount: 0,
+            failureCount: 0,
+            refundCount: 0,
+            totalVolume: 0,
+            refundVolume: 0,
+            emiType
+          };
+        }
+        
+        summary[key][emiType].totalTransactions += 1;
+        summary[key][emiType].totalVolume += item.amount;
+        
+        if (item.status === "success") summary[key][emiType].successCount += 1;
+        if (item.status === "failure") summary[key][emiType].failureCount += 1;
+        if (item.isRefunded) {
+          summary[key][emiType].refundCount += 1;
+          summary[key][emiType].refundVolume += item.amount;
+        }
+      });
+
+      // Flatten the nested structure for rendering
+      const flattenedSummary: Record<string, PaymentSummary> = {};
       
-      summary[key].totalTransactions += 1;
-      summary[key].totalVolume += item.amount;
+      Object.entries(summary).forEach(([key, emiGroups]) => {
+        Object.entries(emiGroups as Record<string, PaymentSummary>).forEach(([emiType, data]) => {
+          const flatKey = `${key}-${emiType}`;
+          flattenedSummary[flatKey] = {
+            ...data,
+            emiType
+          };
+        });
+      });
       
-      if (item.status === "success") summary[key].successCount += 1;
-      if (item.status === "failure") summary[key].failureCount += 1;
-      if (item.isRefunded) {
-        summary[key].refundCount += 1;
-        summary[key].refundVolume += item.amount;
-      }
-    });
-    
-    return summary;
+      return flattenedSummary;
+    } else {
+      // Original grouping logic
+      filteredData.forEach(item => {
+        const key = item[groupBy];
+        
+        if (!summary[key]) {
+          summary[key] = {
+            totalTransactions: 0,
+            successCount: 0,
+            failureCount: 0,
+            refundCount: 0,
+            totalVolume: 0,
+            refundVolume: 0
+          };
+        }
+        
+        const summaryItem = summary[key] as PaymentSummary;
+        summaryItem.totalTransactions += 1;
+        summaryItem.totalVolume += item.amount;
+        
+        if (item.status === "success") summaryItem.successCount += 1;
+        if (item.status === "failure") summaryItem.failureCount += 1;
+        if (item.isRefunded) {
+          summaryItem.refundCount += 1;
+          summaryItem.refundVolume += item.amount;
+        }
+      });
+      
+      return summary as Record<string, PaymentSummary>;
+    }
   };
   
   // Get summary data based on current view type
@@ -549,7 +629,8 @@ const Index = () => {
           <PaymentBarChart 
             data={filteredData} 
             viewType={viewType} 
-            chartMetric={chartMetric} 
+            chartMetric={chartMetric}
+            emiTypes={emiTypes} 
           />
         </div>
         
@@ -563,7 +644,7 @@ const Index = () => {
         </div>
       </Card>
       
-      {/* Summary Table */}
+      {/* Summary Table - Updated with EMI Type column when needed */}
       <Card className="p-4">
         <h2 className="text-xl font-bold mb-4">
           {viewType === "gateway" ? "Payment Gateway Summary" : "Payment Method Summary"}
@@ -573,6 +654,7 @@ const Index = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>{viewType === "gateway" ? "Payment Gateway" : "Payment Method"}</TableHead>
+                {emiTypes.length > 0 && <TableHead>EMI Type</TableHead>}
                 <TableHead>Total Transactions</TableHead>
                 <TableHead>Total Volume</TableHead>
                 <TableHead>Success%</TableHead>
@@ -581,24 +663,42 @@ const Index = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Object.entries(summaryData).map(([key, data]) => (
-                <TableRow key={key}>
-                  <TableCell className="font-medium">{key}</TableCell>
-                  <TableCell>{data.totalTransactions}</TableCell>
-                  <TableCell>{formatCurrency(data.totalVolume)}</TableCell>
-                  <TableCell>
-                    {data.totalTransactions > 0 
-                      ? ((data.successCount / data.totalTransactions) * 100).toFixed(1) 
-                      : 0}%
-                  </TableCell>
-                  <TableCell>
-                    {data.totalTransactions > 0 
-                      ? ((data.failureCount / data.totalTransactions) * 100).toFixed(1) 
-                      : 0}%
-                  </TableCell>
-                  <TableCell>{formatCurrency(data.refundVolume)}</TableCell>
-                </TableRow>
-              ))}
+              {Object.entries(summaryData).map(([key, data]) => {
+                // Extract the payment method/gateway name
+                const displayName = key.includes('-') && data.emiType 
+                  ? key.split('-')[0] 
+                  : key;
+                
+                return (
+                  <TableRow key={key}>
+                    <TableCell className="font-medium">
+                      {viewType === "method" && displayName === "creditCard" ? "Credit Card" : 
+                       viewType === "method" && displayName === "debitCard" ? "Debit Card" :
+                       viewType === "method" && displayName === "netBanking" ? "Net Banking" :
+                       viewType === "method" && displayName === "upi" ? "UPI" :
+                       viewType === "method" && displayName === "wallet" ? "Wallet" : displayName}
+                    </TableCell>
+                    {emiTypes.length > 0 && (
+                      <TableCell>
+                        {data.emiType && data.emiType !== "none" ? formatEmiTypeName(data.emiType) : "N/A"}
+                      </TableCell>
+                    )}
+                    <TableCell>{data.totalTransactions}</TableCell>
+                    <TableCell>{formatCurrency(data.totalVolume)}</TableCell>
+                    <TableCell>
+                      {data.totalTransactions > 0 
+                        ? ((data.successCount / data.totalTransactions) * 100).toFixed(1) 
+                        : 0}%
+                    </TableCell>
+                    <TableCell>
+                      {data.totalTransactions > 0 
+                        ? ((data.failureCount / data.totalTransactions) * 100).toFixed(1) 
+                        : 0}%
+                    </TableCell>
+                    <TableCell>{formatCurrency(data.refundVolume)}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
