@@ -9,8 +9,8 @@ export const mockData = [
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
     paymentGateway: "Razorpay",
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
-    paymentMethod: ["creditCard", "debitCard", "netBanking", "upi", "wallet"][Math.floor(Math.random() * 5)],
-    emiType: Math.random() > 0.7 && ["creditCard", "debitCard"].includes(["creditCard", "debitCard", "netBanking", "upi", "wallet"][Math.floor(Math.random() * 5)]) 
+    paymentMethod: ["creditCard", "debitCard", "netBanking", "upi", "wallet", "emi", "shopse"][Math.floor(Math.random() * 7)],
+    emiType: Math.random() > 0.7 && ["creditCard", "debitCard", "emi"].includes(["creditCard", "debitCard", "netBanking", "upi", "wallet", "emi", "shopse"][Math.floor(Math.random() * 7)]) 
       ? ["standard", "noCost"][Math.floor(Math.random() * 2)] 
       : null,
     amount: Math.floor(Math.random() * 10000) + 500,
@@ -30,8 +30,8 @@ export const mockData = [
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
     paymentGateway: "PayU",
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
-    paymentMethod: ["creditCard", "debitCard", "netBanking", "upi", "wallet"][Math.floor(Math.random() * 5)],
-    emiType: Math.random() > 0.7 && ["creditCard", "debitCard"].includes(["creditCard", "debitCard", "netBanking", "upi", "wallet"][Math.floor(Math.random() * 5)]) 
+    paymentMethod: ["creditCard", "debitCard", "netBanking", "upi", "wallet", "emi", "shopse"][Math.floor(Math.random() * 7)],
+    emiType: Math.random() > 0.7 && ["creditCard", "debitCard", "emi"].includes(["creditCard", "debitCard", "netBanking", "upi", "wallet", "emi", "shopse"][Math.floor(Math.random() * 7)]) 
       ? ["standard", "noCost"][Math.floor(Math.random() * 2)] 
       : null,
     amount: Math.floor(Math.random() * 8000) + 1000,
@@ -59,6 +59,24 @@ export const mockData = [
     leadId: `LEAD${10000 + Math.floor(Math.random() * 90000)}`,
     isRefunded: Math.random() > 0.92,
     // Add failure reason for failure transactions
+    failureReason: ["Insufficient Funds", "Bank Declined", "Transaction Timeout", "Authentication Failed", "Network Error"][Math.floor(Math.random() * 5)]
+  })),
+
+  // Add EMI transactions
+  ...Array.from({ length: 15 }, (_, index) => ({
+    id: `emi_${8000 + index}`,
+    date: new Date(2024, 4, Math.floor(index / 3) + 1),
+    lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
+    businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
+    paymentGateway: ["Razorpay", "PayU"][Math.floor(Math.random() * 2)],
+    bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
+    paymentMethod: "emi",
+    emiType: ["standard", "noCost"][Math.floor(Math.random() * 2)],
+    amount: Math.floor(Math.random() * 25000) + 5000,
+    status: ["success", "failure", "pending"][Math.random() > 0.8 ? (Math.random() > 0.5 ? 2 : 1) : 0],
+    utr: `UTR${100000 + Math.floor(Math.random() * 900000)}`,
+    leadId: `LEAD${10000 + Math.floor(Math.random() * 90000)}`,
+    isRefunded: Math.random() > 0.9,
     failureReason: ["Insufficient Funds", "Bank Declined", "Transaction Timeout", "Authentication Failed", "Network Error"][Math.floor(Math.random() * 5)]
   })),
 
@@ -106,7 +124,7 @@ export const ensureDataForAllFilterOptions = () => {
   const businessTypes = ["b2c", "b2b", "corporate"];
   const paymentGateways = ["Razorpay", "PayU"]; // Keep only Razorpay and PayU
   const banks = ["hdfc", "icici", "sbi", "axis", "kotak"];
-  const paymentMethods = ["creditCard", "debitCard", "netBanking", "upi", "wallet", "shopse"]; // Add shopse
+  const paymentMethods = ["creditCard", "debitCard", "netBanking", "upi", "wallet", "shopse", "emi"]; // Add emi
   const emiTypes = ["standard", "noCost"];
   const statuses = ["success", "failure", "pending"];
   
@@ -150,14 +168,14 @@ export const ensureDataForAllFilterOptions = () => {
               gateway, 
               bank, 
               method, 
-              (method === "creditCard" || method === "debitCard") && Math.random() > 0.5 ? 
+              (method === "creditCard" || method === "debitCard" || method === "emi") && Math.random() > 0.5 ? 
                 emiTypes[Math.floor(Math.random() * 2)] : null,
               status
             ));
           });
 
-          // For credit and debit cards, ensure EMI type combinations
-          if (method === "creditCard" || method === "debitCard") {
+          // For credit and debit cards and EMI, ensure EMI type combinations
+          if (method === "creditCard" || method === "debitCard" || method === "emi") {
             emiTypes.forEach(emi => {
               mockData.push(createSampleTransaction(
                 bType,
@@ -188,7 +206,7 @@ export const ensureDataForAllFilterOptions = () => {
         paymentGateway: gateway,
         bank: banks[Math.floor(Math.random() * banks.length)],
         paymentMethod: method,
-        emiType: (method === "creditCard" || method === "debitCard") && Math.random() > 0.7 ? 
+        emiType: (method === "creditCard" || method === "debitCard" || method === "emi") && Math.random() > 0.7 ? 
           emiTypes[Math.floor(Math.random() * 2)] : null,
         amount: Math.floor(Math.random() * 15000) + 1000,
         status: "failure",
@@ -203,4 +221,3 @@ export const ensureDataForAllFilterOptions = () => {
 
 // Call the function to populate the data
 ensureDataForAllFilterOptions();
-

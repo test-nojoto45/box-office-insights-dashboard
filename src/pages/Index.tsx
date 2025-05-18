@@ -29,6 +29,7 @@ interface PaymentSummary {
   totalVolume: number;
   refundVolume: number;
   emiType?: string; // Add emiType field to the summary
+  paymentGateway?: string; // Add paymentGateway field for failure breakdown
 }
 
 const Index = () => {
@@ -83,13 +84,20 @@ const Index = () => {
     filtered = filtered.filter(item => {
       // Check if EMI types are selected and payment methods are compatible
       const emiSelected = emiTypes.length > 0;
-      const cardMethodSelected = paymentMethods.includes("creditCard") || paymentMethods.includes("debitCard");
+      const cardOrEmiSelected = paymentMethods.includes("creditCard") || 
+                               paymentMethods.includes("debitCard") ||
+                               paymentMethods.includes("emi");
       const isEmiCompatible = !emiSelected || 
-        ((item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard") && 
+        ((item.paymentMethod === "creditCard" || 
+          item.paymentMethod === "debitCard" ||
+          item.paymentMethod === "emi") && 
          includesOrEmpty(emiTypes, item.emiType));
       
-      // If EMI types are selected but no card payment methods are selected, filter out non-card items
-      if (emiSelected && !cardMethodSelected && item.paymentMethod !== "creditCard" && item.paymentMethod !== "debitCard") {
+      // If EMI types are selected but no card/emi payment methods are selected, filter out non-compatible items
+      if (emiSelected && !cardOrEmiSelected && 
+          item.paymentMethod !== "creditCard" && 
+          item.paymentMethod !== "debitCard" &&
+          item.paymentMethod !== "emi") {
         return false;
       }
       
@@ -135,9 +143,24 @@ const Index = () => {
     }
   };
 
-  // Modified to include EMI type in summary
+  // Format payment method name for display
+  const formatMethodName = (method: string) => {
+    switch (method) {
+      case "creditCard": return "Credit Card";
+      case "debitCard": return "Debit Card";
+      case "netBanking": return "Net Banking";
+      case "upi": return "UPI";
+      case "wallet": return "Wallet";
+      case "shopse": return "Shopse";
+      case "emi": return "EMI";
+      default: return method;
+    }
+  };
+
+  // Modified to include EMI type and payment gateway in summary
   const prepareSummaryData = () => {
     const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
+    const showFailures = paymentStatuses.length === 1 && paymentStatuses.includes("failure");
     
     // Create a summary object based on the view type (gateway or method)
     const summary: Record<string, PaymentSummary | Record<string, PaymentSummary>> = {};
@@ -145,7 +168,9 @@ const Index = () => {
     // Check if we need to group by EMI type
     const shouldGroupByEmi = emiTypes.length > 0 && 
       filteredData.some(item => 
-        (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard") && 
+        (item.paymentMethod === "creditCard" || 
+         item.paymentMethod === "debitCard" ||
+         item.paymentMethod === "emi") && 
         item.emiType && 
         emiTypes.includes(item.emiType)
       );
@@ -155,8 +180,11 @@ const Index = () => {
       filteredData.forEach(item => {
         const key = item[groupBy];
         
-        // Skip non-card items if EMI types are selected
-        if (emiTypes.length > 0 && item.paymentMethod !== "creditCard" && item.paymentMethod !== "debitCard") {
+        // Skip non-card/emi items if EMI types are selected
+        if (emiTypes.length > 0 && 
+            item.paymentMethod !== "creditCard" && 
+            item.paymentMethod !== "debitCard" &&
+            item.paymentMethod !== "emi") {
           return;
         }
         
@@ -179,7 +207,8 @@ const Index = () => {
             refundCount: 0,
             totalVolume: 0,
             refundVolume: 0,
-            emiType
+            emiType,
+            paymentGateway: viewType === "method" ? item.paymentGateway : undefined
           };
         }
         
@@ -208,6 +237,34 @@ const Index = () => {
       });
       
       return flattenedSummary;
+    } else if (showFailures && viewType === "method") {
+      // For failure status with method view, include payment gateway information
+      const failureData = filteredData.filter(item => item.status === "failure");
+      
+      failureData.forEach(item => {
+        const key = item[groupBy];
+        const gatewayKey = `${key}-${item.paymentGateway}`;
+        
+        // Create entry for method-gateway combination
+        if (!summary[gatewayKey]) {
+          summary[gatewayKey] = {
+            totalTransactions: 0,
+            successCount: 0,
+            failureCount: 0,
+            refundCount: 0,
+            totalVolume: 0,
+            refundVolume: 0,
+            paymentGateway: item.paymentGateway
+          };
+        }
+        
+        const summaryItem = summary[gatewayKey] as PaymentSummary;
+        summaryItem.totalTransactions += 1;
+        summaryItem.totalVolume += item.amount;
+        summaryItem.failureCount += 1;
+      });
+      
+      return summary as Record<string, PaymentSummary>;
     } else {
       // Original grouping logic
       filteredData.forEach(item => {
@@ -220,7 +277,8 @@ const Index = () => {
             failureCount: 0,
             refundCount: 0,
             totalVolume: 0,
-            refundVolume: 0
+            refundVolume: 0,
+            paymentGateway: viewType === "method" ? item.paymentGateway : undefined
           };
         }
         
@@ -246,10 +304,12 @@ const Index = () => {
   // Helper function to handle EMI type selection
   const handleEmiTypeToggle = (emiType: string) => {
     // Check if we have credit or debit card in payment methods
-    const hasCardMethod = paymentMethods.includes("creditCard") || paymentMethods.includes("debitCard");
+    const hasCardOrEmiMethod = paymentMethods.includes("creditCard") || 
+                           paymentMethods.includes("debitCard") ||
+                           paymentMethods.includes("emi");
     
     // If EMI is being selected and no card payment method is selected, auto-select credit card
-    if (!hasCardMethod && !emiTypes.includes(emiType)) {
+    if (!hasCardOrEmiMethod && !emiTypes.includes(emiType)) {
       setPaymentMethods(prev => [...prev, "creditCard"]);
     }
     
@@ -433,11 +493,11 @@ const Index = () => {
                     </div>
                   </div>
                   
-                  {/* Payment Method - Updated to include Shopse */}
+                  {/* Payment Method - Updated to include Shopse and EMI */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Method</Label>
                     <div className="space-y-2">
-                      {["creditCard", "debitCard", "netBanking", "upi", "wallet", "shopse"].map((method) => (
+                      {["creditCard", "debitCard", "netBanking", "upi", "wallet", "shopse", "emi"].map((method) => (
                         <div key={method} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`dialog-method-${method}`}
@@ -445,12 +505,7 @@ const Index = () => {
                             onCheckedChange={() => handleCheckboxToggle(method, paymentMethods, setPaymentMethods)}
                           />
                           <label htmlFor={`dialog-method-${method}`} className="text-sm leading-none cursor-pointer">
-                            {method === "creditCard" ? "Credit Card" :
-                             method === "debitCard" ? "Debit Card" :
-                             method === "netBanking" ? "Net Banking" :
-                             method === "upi" ? "UPI" :
-                             method === "wallet" ? "Wallet" :
-                             method === "shopse" ? "Shopse" : method}
+                            {formatMethodName(method)}
                           </label>
                         </div>
                       ))}
@@ -469,7 +524,8 @@ const Index = () => {
                             onCheckedChange={() => handleEmiTypeToggle(emi)}
                             disabled={paymentMethods.length > 0 && 
                               !paymentMethods.includes("creditCard") && 
-                              !paymentMethods.includes("debitCard")}
+                              !paymentMethods.includes("debitCard") &&
+                              !paymentMethods.includes("emi")}
                           />
                           <label htmlFor={`dialog-emi-${emi}`} className="text-sm leading-none cursor-pointer">
                             {emi === "standard" ? "Standard" : "No Cost"}
@@ -477,7 +533,7 @@ const Index = () => {
                         </div>
                       ))}
                       <p className="text-xs text-muted-foreground mt-1">
-                        EMI types only apply to credit and debit cards
+                        EMI types only apply to credit/debit cards and EMI method
                       </p>
                     </div>
                   </div>
@@ -580,7 +636,7 @@ const Index = () => {
         
         <Card className="p-4">
           <div className="space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Success Percentage</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">Percentage</h3>
             <p className="text-2xl font-bold text-green-600">{successPercentage.toFixed(1)}%</p>
             <p className="text-sm text-muted-foreground">+5% vs last period</p>
           </div>
@@ -616,17 +672,17 @@ const Index = () => {
               </Tabs>
             </div>
             
-            {/* Only display chartMetric selector when not showing failure reasons */}
-            {!(paymentStatuses.length === 1 && paymentStatuses.includes("failure")) && (
-              <div className="flex items-start justify-start pl-1">
-                <Tabs defaultValue={chartMetric} onValueChange={setChartMetric} className="w-[400px]">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="volume">Volume Processed</TabsTrigger>
-                    <TabsTrigger value="success">Success Percentage</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-            )}
+            {/* Always display chartMetric selector now, even for failure reasons */}
+            <div className="flex items-start justify-start pl-1">
+              <Tabs defaultValue={chartMetric} onValueChange={setChartMetric} className="w-[400px]">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="volume">Volume Processed</TabsTrigger>
+                  <TabsTrigger value="success">
+                    {paymentStatuses.length === 1 && paymentStatuses.includes("failure") ? "Failures Count" : "Success Percentage"}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
         </div>
         
@@ -650,7 +706,7 @@ const Index = () => {
         </div>
       </Card>
       
-      {/* Summary Table - Updated with EMI Type column when needed */}
+      {/* Summary Table - Updated with EMI Type column when needed and Payment Gateway for failures */}
       <Card className="p-4">
         <h2 className="text-xl font-bold mb-4">
           {viewType === "gateway" ? "Payment Gateway Summary" : "Payment Method Summary"}
@@ -661,47 +717,58 @@ const Index = () => {
               <TableRow>
                 <TableHead>{viewType === "gateway" ? "Payment Gateway" : "Payment Method"}</TableHead>
                 {emiTypes.length > 0 && <TableHead>EMI Type</TableHead>}
+                {viewType === "method" && paymentStatuses.length === 1 && paymentStatuses.includes("failure") && (
+                  <TableHead>Payment Gateway</TableHead>
+                )}
                 <TableHead>Total Transactions</TableHead>
                 <TableHead>Total Volume</TableHead>
-                <TableHead>Success%</TableHead>
-                <TableHead>Failure%</TableHead>
+                {!(paymentStatuses.length === 1 && paymentStatuses.includes("failure")) && (
+                  <>
+                    <TableHead>Success%</TableHead>
+                    <TableHead>Failure%</TableHead>
+                  </>
+                )}
                 <TableHead>Total Amount Refunded</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {Object.entries(summaryData).map(([key, data]) => {
                 // Extract the payment method/gateway name
-                const displayName = key.includes('-') && data.emiType 
+                const displayName = key.includes('-') && (data.emiType || data.paymentGateway) 
                   ? key.split('-')[0] 
                   : key;
                 
                 return (
                   <TableRow key={key}>
                     <TableCell className="font-medium">
-                      {viewType === "method" && displayName === "creditCard" ? "Credit Card" : 
-                       viewType === "method" && displayName === "debitCard" ? "Debit Card" :
-                       viewType === "method" && displayName === "netBanking" ? "Net Banking" :
-                       viewType === "method" && displayName === "upi" ? "UPI" :
-                       viewType === "method" && displayName === "wallet" ? "Wallet" : 
-                       viewType === "method" && displayName === "shopse" ? "Shopse" : displayName}
+                      {formatMethodName(displayName)}
                     </TableCell>
                     {emiTypes.length > 0 && (
                       <TableCell>
                         {data.emiType && data.emiType !== "none" ? formatEmiTypeName(data.emiType) : "N/A"}
                       </TableCell>
                     )}
+                    {viewType === "method" && paymentStatuses.length === 1 && paymentStatuses.includes("failure") && (
+                      <TableCell>
+                        {data.paymentGateway || (key.includes('-') ? key.split('-')[1] : "N/A")}
+                      </TableCell>
+                    )}
                     <TableCell>{data.totalTransactions}</TableCell>
                     <TableCell>{formatCurrency(data.totalVolume)}</TableCell>
-                    <TableCell>
-                      {data.totalTransactions > 0 
-                        ? ((data.successCount / data.totalTransactions) * 100).toFixed(1) 
-                        : 0}%
-                    </TableCell>
-                    <TableCell>
-                      {data.totalTransactions > 0 
-                        ? ((data.failureCount / data.totalTransactions) * 100).toFixed(1) 
-                        : 0}%
-                    </TableCell>
+                    {!(paymentStatuses.length === 1 && paymentStatuses.includes("failure")) && (
+                      <>
+                        <TableCell>
+                          {data.totalTransactions > 0 
+                            ? ((data.successCount / data.totalTransactions) * 100).toFixed(1) 
+                            : 0}%
+                        </TableCell>
+                        <TableCell>
+                          {data.totalTransactions > 0 
+                            ? ((data.failureCount / data.totalTransactions) * 100).toFixed(1) 
+                            : 0}%
+                        </TableCell>
+                      </>
+                    )}
                     <TableCell>{formatCurrency(data.refundVolume)}</TableCell>
                   </TableRow>
                 );
@@ -721,4 +788,3 @@ const Index = () => {
 };
 
 export default Index;
-

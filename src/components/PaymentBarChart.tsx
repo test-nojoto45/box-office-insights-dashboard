@@ -1,5 +1,6 @@
+
 import React, { useMemo } from "react";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps, Cell } from "recharts";
 
 interface PaymentBarChartProps {
   data: any[];
@@ -32,6 +33,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       case "upi": return "UPI";
       case "wallet": return "Wallet";
       case "shopse": return "Shopse";
+      case "emi": return "EMI";
       default: return method;
     }
   };
@@ -47,6 +49,21 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
 
   // Check if we should show failure reasons chart
   const showFailureReasons = paymentStatuses.length === 1 && paymentStatuses.includes("failure");
+
+  // Define colors for different payment gateways and methods
+  const colorMap = {
+    "Razorpay": "#9b87f5", // Primary Purple
+    "PayU": "#F97316", // Bright Orange
+    "creditCard": "#0EA5E9", // Ocean Blue
+    "debitCard": "#1EAEDB", // Bright Blue
+    "netBanking": "#33C3F0", // Sky Blue
+    "upi": "#7E69AB", // Secondary Purple
+    "wallet": "#6E59A5", // Tertiary Purple
+    "shopse": "#8B5CF6", // Vivid Purple
+    "emi": "#ea384c", // Red
+    "default": "#3B82F6", // Default Blue
+    "failure": "#ea384c" // Red for failure
+  };
 
   const chartData = useMemo(() => {
     // If failure status is selected, show top 5 failure reasons
@@ -112,7 +129,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
     if (shouldGroupByEmi) {
       // First filter to only card payments with selected EMI types
       const emiFilteredData = data.filter(item => 
-        (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard") && 
+        (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard" || item.paymentMethod === "emi") && 
         item.emiType && 
         emiTypes.includes(item.emiType)
       );
@@ -130,6 +147,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
             totalAmount: 0,
             successCount: 0,
             totalCount: 0,
+            groupKey, // Store original key for color mapping
           };
         }
         
@@ -146,6 +164,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       return Object.values(groupedData).map((group: any) => ({
         name: `${group.name} (${group.emiTypeName})`,
         originalName: group.name,
+        groupKey: group.groupKey,
         emiType: group.emiType,
         volume: group.totalAmount,
         successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
@@ -178,6 +197,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       // Convert to array and calculate percentages
       return Object.values(groupedData).map((group: any) => ({
         name: viewType === "method" ? formatMethodName(group.name) : group.name,
+        groupKey: group.name, // Store original key for color mapping
         volume: group.totalAmount,
         successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
       }));
@@ -185,7 +205,13 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
   }, [data, viewType, emiTypes, showFailureReasons]);
 
   // Determine what to display based on chartMetric and failure status
-  const dataKey = showFailureReasons ? "count" : (chartMetric === "volume" ? "volume" : "successRate");
+  const dataKey = useMemo(() => {
+    if (showFailureReasons) {
+      return chartMetric === "volume" ? "volume" : "count";
+    } else {
+      return chartMetric === "volume" ? "volume" : "successRate";
+    }
+  }, [showFailureReasons, chartMetric]);
   
   // Format for the tooltip
   const formatTooltip = (value: number, key: string) => {
@@ -243,14 +269,26 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
   }, [showFailureReasons, chartMetric]);
 
   const axisLabel = useMemo(() => {
-    if (showFailureReasons) return "Number of Failures";
+    if (showFailureReasons) {
+      return chartMetric === "volume" ? "Volume (₹)" : "Number of Failures";
+    }
     return chartMetric === "volume" ? "Volume (₹)" : "Success Rate (%)";
   }, [showFailureReasons, chartMetric]);
 
   const chartTitle = useMemo(() => {
-    if (showFailureReasons) return "Top 5 Payment Failure Reasons";
+    if (showFailureReasons) {
+      return chartMetric === "volume" ? "Transaction Volume" : "Top 5 Payment Failure Reasons";
+    }
     return chartMetric === "volume" ? "Transaction Volume" : "Success Rate";
   }, [showFailureReasons, chartMetric]);
+
+  // Get the color for a data item based on its gateway or method
+  const getBarColor = (entry: any) => {
+    if (showFailureReasons) return colorMap.failure;
+    
+    const key = entry.groupKey;
+    return colorMap[key] || colorMap.default;
+  };
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -276,9 +314,12 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
         <Legend />
         <Bar 
           dataKey={dataKey} 
-          fill={barFill} 
           name={chartTitle}
-        />
+        >
+          {chartData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={getBarColor(entry)} />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );
