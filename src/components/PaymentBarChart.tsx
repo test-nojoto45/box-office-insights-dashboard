@@ -115,6 +115,8 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
           name: item.reason,
           count: item.count,
           volume: item.totalAmount,
+          // Calculate failure percentage for each reason
+          failurePercentage: (item.count / failureData.length) * 100,
           // For tooltip breakdown
           breakdown: viewType === "gateway" ? item.gateway : item.method
         }));
@@ -207,7 +209,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
   // Determine what to display based on chartMetric and failure status
   const dataKey = useMemo(() => {
     if (showFailureReasons) {
-      return chartMetric === "volume" ? "volume" : "count";
+      return chartMetric === "volume" ? "volume" : "failurePercentage";
     } else {
       return chartMetric === "volume" ? "volume" : "successRate";
     }
@@ -215,7 +217,9 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
   
   // Format for the tooltip
   const formatTooltip = (value: number, key: string) => {
-    if (showFailureReasons && key === "count") {
+    if (key === "failurePercentage") {
+      return `${value.toFixed(1)}%`;
+    } else if (key === "count") {
       return `${value} Transactions`;
     } else if (chartMetric === "volume" || key === "volume") {
       if (value >= 10000000) {
@@ -270,14 +274,14 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
 
   const axisLabel = useMemo(() => {
     if (showFailureReasons) {
-      return chartMetric === "volume" ? "Volume (₹)" : "Number of Failures";
+      return chartMetric === "volume" ? "Volume (₹)" : "Failure Percentage (%)";
     }
     return chartMetric === "volume" ? "Volume (₹)" : "Success Rate (%)";
   }, [showFailureReasons, chartMetric]);
 
   const chartTitle = useMemo(() => {
     if (showFailureReasons) {
-      return chartMetric === "volume" ? "Transaction Volume" : "Top 5 Payment Failure Reasons";
+      return chartMetric === "volume" ? "Transaction Volume" : "Failure Percentage";
     }
     return chartMetric === "volume" ? "Transaction Volume" : "Success Rate";
   }, [showFailureReasons, chartMetric]);

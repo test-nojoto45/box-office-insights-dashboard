@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Download, ChevronDown, Plus, X, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -47,7 +46,8 @@ const Index = () => {
   const [banks, setBanks] = useState<string[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [emiTypes, setEmiTypes] = useState<string[]>([]);
-  const [paymentStatuses, setPaymentStatuses] = useState<string[]>([]);
+  // Set "success" as the default selected payment status
+  const [paymentStatuses, setPaymentStatuses] = useState<string[]>(["success"]);
   
   // State for view toggle
   const [viewType, setViewType] = useState("gateway"); // "gateway" or "method"
@@ -119,6 +119,27 @@ const Index = () => {
     
     setFilteredData(filtered);
   }, [businessTypes, paymentGateways, banks, paymentMethods, emiTypes, paymentStatuses, dateRange]);
+
+  // Determine what chart metric options to show based on payment status
+  const getChartMetricOptions = () => {
+    const showFailures = paymentStatuses.length === 1 && paymentStatuses.includes("failure");
+    
+    if (showFailures) {
+      return (
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="volume">Volume Processed</TabsTrigger>
+          <TabsTrigger value="success">Failure Percentage</TabsTrigger>
+        </TabsList>
+      );
+    }
+    
+    return (
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="volume">Volume Processed</TabsTrigger>
+        <TabsTrigger value="success">Percentage</TabsTrigger>
+      </TabsList>
+    );
+  };
 
   // Calculate metrics
   const totalVolume = filteredData.reduce((sum, item) => sum + item.amount, 0);
@@ -538,7 +559,7 @@ const Index = () => {
                     </div>
                   </div>
                   
-                  {/* Payment Status */}
+                  {/* Payment Status - With success as default selected */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Status</Label>
                     <div className="space-y-2">
@@ -672,15 +693,10 @@ const Index = () => {
               </Tabs>
             </div>
             
-            {/* Always display chartMetric selector now, even for failure reasons */}
+            {/* Dynamic chart metric selector based on selected payment status */}
             <div className="flex items-start justify-start pl-1">
               <Tabs defaultValue={chartMetric} onValueChange={setChartMetric} className="w-[400px]">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="volume">Volume Processed</TabsTrigger>
-                  <TabsTrigger value="success">
-                    {paymentStatuses.length === 1 && paymentStatuses.includes("failure") ? "Failures Count" : "Success Percentage"}
-                  </TabsTrigger>
-                </TabsList>
+                {getChartMetricOptions()}
               </Tabs>
             </div>
           </div>
