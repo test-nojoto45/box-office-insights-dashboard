@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Download, ChevronDown, Plus, X, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -394,11 +395,11 @@ const Index = () => {
                     </div>
                   </div>
                   
-                  {/* Payment Gateway */}
+                  {/* Payment Gateway - Updated to only show Razorpay and PayU */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Gateway</Label>
                     <div className="space-y-2">
-                      {["Razorpay", "PayU", "Stripe", "PayPal"].map((gateway) => (
+                      {["Razorpay", "PayU"].map((gateway) => (
                         <div key={gateway} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`dialog-gateway-${gateway}`}
@@ -432,7 +433,7 @@ const Index = () => {
                     </div>
                   </div>
                   
-                  {/* Payment Method */}
+                  {/* Payment Method - Updated to include Shopse */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Method</Label>
                     <div className="space-y-2">
@@ -615,14 +616,17 @@ const Index = () => {
               </Tabs>
             </div>
             
-            <div className="flex items-start justify-start pl-1">
-              <Tabs defaultValue={chartMetric} onValueChange={setChartMetric} className="w-[400px]">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="volume">Volume Processed</TabsTrigger>
-                  <TabsTrigger value="success">Success Percentage</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
+            {/* Only display chartMetric selector when not showing failure reasons */}
+            {!(paymentStatuses.length === 1 && paymentStatuses.includes("failure")) && (
+              <div className="flex items-start justify-start pl-1">
+                <Tabs defaultValue={chartMetric} onValueChange={setChartMetric} className="w-[400px]">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="volume">Volume Processed</TabsTrigger>
+                    <TabsTrigger value="success">Success Percentage</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+            )}
           </div>
         </div>
         
@@ -631,7 +635,8 @@ const Index = () => {
             data={filteredData} 
             viewType={viewType} 
             chartMetric={chartMetric}
-            emiTypes={emiTypes} 
+            emiTypes={emiTypes}
+            paymentStatuses={paymentStatuses} 
           />
         </div>
         
@@ -677,7 +682,8 @@ const Index = () => {
                        viewType === "method" && displayName === "debitCard" ? "Debit Card" :
                        viewType === "method" && displayName === "netBanking" ? "Net Banking" :
                        viewType === "method" && displayName === "upi" ? "UPI" :
-                       viewType === "method" && displayName === "wallet" ? "Wallet" : displayName}
+                       viewType === "method" && displayName === "wallet" ? "Wallet" : 
+                       viewType === "method" && displayName === "shopse" ? "Shopse" : displayName}
                     </TableCell>
                     {emiTypes.length > 0 && (
                       <TableCell>
@@ -715,3 +721,4 @@ const Index = () => {
 };
 
 export default Index;
+

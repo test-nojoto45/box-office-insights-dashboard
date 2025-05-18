@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps } from "recharts";
 
@@ -6,7 +5,8 @@ interface PaymentBarChartProps {
   data: any[];
   viewType: string;
   chartMetric: string;
-  emiTypes?: string[]; // Add emiTypes as an optional prop
+  emiTypes?: string[]; // Optional EMI types
+  paymentStatuses?: string[]; // Add payment statuses prop
 }
 
 // Define CustomTooltipProps interface to fix the TypeScript error
@@ -16,7 +16,13 @@ interface CustomTooltipProps extends TooltipProps<any, any> {
   label?: any;
 }
 
-const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chartMetric, emiTypes = [] }) => {
+const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ 
+  data, 
+  viewType, 
+  chartMetric, 
+  emiTypes = [],
+  paymentStatuses = [] 
+}) => {
   // Format payment method names for display - moved up before it's used
   const formatMethodName = (method: string) => {
     switch (method) {
@@ -25,6 +31,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chart
       case "netBanking": return "Net Banking";
       case "upi": return "UPI";
       case "wallet": return "Wallet";
+      case "shopse": return "Shopse";
       default: return method;
     }
   };
@@ -38,7 +45,65 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chart
     }
   };
 
+  // Check if we should show failure reasons chart
+  const showFailureReasons = paymentStatuses.length === 1 && paymentStatuses.includes("failure");
+
   const chartData = useMemo(() => {
+    // If failure status is selected, show top 5 failure reasons
+    if (showFailureReasons) {
+      // Group data by failure reason
+      const failureData = data.filter(item => item.status === "failure" && item.failureReason);
+      
+      const groupedByReason = failureData.reduce((acc, item) => {
+        const key = item.failureReason || "Unknown";
+        
+        if (!acc[key]) {
+          acc[key] = {
+            reason: key,
+            count: 0,
+            totalAmount: 0,
+            gateway: viewType === "gateway" ? {} : null,
+            method: viewType === "method" ? {} : null,
+          };
+        }
+        
+        acc[key].count += 1;
+        acc[key].totalAmount += item.amount;
+        
+        // Group by gateway or method depending on viewType
+        if (viewType === "gateway" && item.paymentGateway) {
+          const gateway = item.paymentGateway;
+          if (!acc[key].gateway[gateway]) {
+            acc[key].gateway[gateway] = { count: 0, amount: 0 };
+          }
+          acc[key].gateway[gateway].count += 1;
+          acc[key].gateway[gateway].amount += item.amount;
+        } else if (viewType === "method" && item.paymentMethod) {
+          const method = item.paymentMethod;
+          if (!acc[key].method[method]) {
+            acc[key].method[method] = { count: 0, amount: 0 };
+          }
+          acc[key].method[method].count += 1;
+          acc[key].method[method].amount += item.amount;
+        }
+        
+        return acc;
+      }, {});
+      
+      // Convert to array and sort by count
+      return Object.values(groupedByReason)
+        .sort((a: any, b: any) => b.count - a.count)
+        .slice(0, 5) // Take top 5
+        .map((item: any) => ({
+          name: item.reason,
+          count: item.count,
+          volume: item.totalAmount,
+          // For tooltip breakdown
+          breakdown: viewType === "gateway" ? item.gateway : item.method
+        }));
+    }
+    
+    // Otherwise use original chart logic
     // Check if we need to group by EMI type
     const shouldGroupByEmi = emiTypes.length > 0 && 
       data.some(item => item.emiType && emiTypes.includes(item.emiType));
@@ -117,14 +182,16 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chart
         successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
       }));
     }
-  }, [data, viewType, emiTypes]);
+  }, [data, viewType, emiTypes, showFailureReasons]);
 
-  // Determine what to display based on chartMetric
-  const dataKey = chartMetric === "volume" ? "volume" : "successRate";
+  // Determine what to display based on chartMetric and failure status
+  const dataKey = showFailureReasons ? "count" : (chartMetric === "volume" ? "volume" : "successRate");
   
   // Format for the tooltip
-  const formatTooltip = (value: number) => {
-    if (chartMetric === "volume") {
+  const formatTooltip = (value: number, key: string) => {
+    if (showFailureReasons && key === "count") {
+      return `${value} Transactions`;
+    } else if (chartMetric === "volume" || key === "volume") {
       if (value >= 10000000) {
         return `₹${(value / 10000000).toFixed(2)} Cr`;
       } else if (value >= 100000) {
@@ -145,7 +212,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chart
           <p className="font-medium">{label}</p>
           {payload.map((entry, index) => (
             <p key={`item-${index}`} style={{ color: entry.color }}>
-              {entry.name}: {formatTooltip(entry.value)}
+              {entry.name}: {formatTooltip(entry.value, entry.dataKey)}
             </p>
           ))}
           {payload[0].payload.emiType && (
@@ -153,11 +220,37 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chart
               EMI Type: {formatEmiTypeName(payload[0].payload.emiType)}
             </p>
           )}
+          {/* Show breakdown for failure reasons */}
+          {showFailureReasons && payload[0].payload.breakdown && (
+            <div className="mt-2 border-t pt-1 text-xs">
+              <p className="font-medium">Breakdown:</p>
+              {Object.entries(payload[0].payload.breakdown).map(([key, value]: [string, any]) => (
+                <p key={key} className="ml-2">
+                  {viewType === "method" ? formatMethodName(key) : key}: {value.count} ({formatTooltip(value.amount, "volume")})
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       );
     }
     return null;
   };
+
+  const barFill = useMemo(() => {
+    if (showFailureReasons) return "#EF4444"; // Red for failure reasons
+    return chartMetric === "volume" ? "#3B82F6" : "#10B981"; // Blue for volume, green for success rate
+  }, [showFailureReasons, chartMetric]);
+
+  const axisLabel = useMemo(() => {
+    if (showFailureReasons) return "Number of Failures";
+    return chartMetric === "volume" ? "Volume (₹)" : "Success Rate (%)";
+  }, [showFailureReasons, chartMetric]);
+
+  const chartTitle = useMemo(() => {
+    if (showFailureReasons) return "Top 5 Payment Failure Reasons";
+    return chartMetric === "volume" ? "Transaction Volume" : "Success Rate";
+  }, [showFailureReasons, chartMetric]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -174,7 +267,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chart
         <XAxis dataKey="name" angle={-45} textAnchor="end" height={70} />
         <YAxis 
           label={{ 
-            value: chartMetric === "volume" ? "Volume (₹)" : "Success Rate (%)", 
+            value: axisLabel, 
             angle: -90, 
             position: "insideLeft" 
           }} 
@@ -183,8 +276,8 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({ data, viewType, chart
         <Legend />
         <Bar 
           dataKey={dataKey} 
-          fill={chartMetric === "volume" ? "#3B82F6" : "#10B981"} 
-          name={chartMetric === "volume" ? "Transaction Volume" : "Success Rate"}
+          fill={barFill} 
+          name={chartTitle}
         />
       </BarChart>
     </ResponsiveContainer>

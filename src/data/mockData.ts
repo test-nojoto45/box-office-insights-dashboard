@@ -17,7 +17,9 @@ export const mockData = [
     status: ["success", "failure", "pending"][Math.random() > 0.8 ? (Math.random() > 0.5 ? 2 : 1) : 0],
     utr: `UTR${100000 + Math.floor(Math.random() * 900000)}`,
     leadId: `LEAD${10000 + Math.floor(Math.random() * 90000)}`,
-    isRefunded: Math.random() > 0.9
+    isRefunded: Math.random() > 0.9,
+    // Add failure reason for failure transactions
+    failureReason: ["Insufficient Funds", "Bank Declined", "Transaction Timeout", "Authentication Failed", "Network Error"][Math.floor(Math.random() * 5)]
   })),
   
   // PayU transactions
@@ -36,45 +38,28 @@ export const mockData = [
     status: ["success", "failure", "pending"][Math.random() > 0.8 ? (Math.random() > 0.5 ? 2 : 1) : 0],
     utr: `UTR${100000 + Math.floor(Math.random() * 900000)}`,
     leadId: `LEAD${10000 + Math.floor(Math.random() * 90000)}`,
-    isRefunded: Math.random() > 0.85
+    isRefunded: Math.random() > 0.85,
+    // Add failure reason for failure transactions
+    failureReason: ["Insufficient Funds", "Bank Declined", "Transaction Timeout", "Authentication Failed", "Network Error"][Math.floor(Math.random() * 5)]
   })),
   
-  // Stripe transactions
+  // Add Shopse transactions
   ...Array.from({ length: 20 }, (_, index) => ({
-    id: `st_${3000 + index}`,
+    id: `sh_${7000 + index}`,
     date: new Date(2024, 4, Math.floor(index / 3) + 1),
     lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
-    paymentGateway: "Stripe",
+    paymentGateway: ["Razorpay", "PayU"][Math.floor(Math.random() * 2)],
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
-    paymentMethod: ["creditCard", "debitCard", "netBanking", "upi", "wallet"][Math.floor(Math.random() * 5)],
-    emiType: Math.random() > 0.7 && ["creditCard", "debitCard"].includes(["creditCard", "debitCard", "netBanking", "upi", "wallet"][Math.floor(Math.random() * 5)]) 
-      ? ["standard", "noCost"][Math.floor(Math.random() * 2)] 
-      : null,
-    amount: Math.floor(Math.random() * 12000) + 2000,
+    paymentMethod: "shopse",
+    emiType: null,
+    amount: Math.floor(Math.random() * 18000) + 2000,
     status: ["success", "failure", "pending"][Math.random() > 0.8 ? (Math.random() > 0.5 ? 2 : 1) : 0],
     utr: `UTR${100000 + Math.floor(Math.random() * 900000)}`,
     leadId: `LEAD${10000 + Math.floor(Math.random() * 90000)}`,
-    isRefunded: Math.random() > 0.92
-  })),
-  
-  // PayPal transactions
-  ...Array.from({ length: 15 }, (_, index) => ({
-    id: `pp_${4000 + index}`,
-    date: new Date(2024, 4, Math.floor(index / 3) + 1),
-    lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
-    businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
-    paymentGateway: "PayPal",
-    bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
-    paymentMethod: ["creditCard", "debitCard", "netBanking", "upi", "wallet"][Math.floor(Math.random() * 5)],
-    emiType: Math.random() > 0.7 && ["creditCard", "debitCard"].includes(["creditCard", "debitCard", "netBanking", "upi", "wallet"][Math.floor(Math.random() * 5)]) 
-      ? ["standard", "noCost"][Math.floor(Math.random() * 2)] 
-      : null,
-    amount: Math.floor(Math.random() * 15000) + 1500,
-    status: ["success", "failure", "pending"][Math.random() > 0.8 ? (Math.random() > 0.5 ? 2 : 1) : 0],
-    utr: `UTR${100000 + Math.floor(Math.random() * 900000)}`,
-    leadId: `LEAD${10000 + Math.floor(Math.random() * 90000)}`,
-    isRefunded: Math.random() > 0.88
+    isRefunded: Math.random() > 0.92,
+    // Add failure reason for failure transactions
+    failureReason: ["Insufficient Funds", "Bank Declined", "Transaction Timeout", "Authentication Failed", "Network Error"][Math.floor(Math.random() * 5)]
   })),
 
   // Specific Credit Card + EMI Type data
@@ -83,7 +68,7 @@ export const mockData = [
     date: new Date(2024, 4, Math.floor(index / 3) + 1),
     lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
-    paymentGateway: ["Razorpay", "PayU", "Stripe", "PayPal"][Math.floor(Math.random() * 4)],
+    paymentGateway: ["Razorpay", "PayU"][Math.floor(Math.random() * 2)],
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
     paymentMethod: "creditCard",
     emiType: ["standard", "noCost"][Math.floor(Math.random() * 2)],
@@ -91,7 +76,9 @@ export const mockData = [
     status: ["success", "failure", "pending"][Math.random() > 0.8 ? (Math.random() > 0.5 ? 2 : 1) : 0],
     utr: `UTR${100000 + Math.floor(Math.random() * 900000)}`,
     leadId: `LEAD${10000 + Math.floor(Math.random() * 90000)}`,
-    isRefunded: Math.random() > 0.9
+    isRefunded: Math.random() > 0.9,
+    // Add failure reason for failure transactions
+    failureReason: ["Insufficient Funds", "Bank Declined", "Transaction Timeout", "Authentication Failed", "Network Error"][Math.floor(Math.random() * 5)]
   })),
 
   // Specific Debit Card + EMI Type data
@@ -100,7 +87,7 @@ export const mockData = [
     date: new Date(2024, 4, Math.floor(index / 3) + 1),
     lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
-    paymentGateway: ["Razorpay", "PayU", "Stripe", "PayPal"][Math.floor(Math.random() * 4)],
+    paymentGateway: ["Razorpay", "PayU"][Math.floor(Math.random() * 2)],
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
     paymentMethod: "debitCard",
     emiType: ["standard", "noCost"][Math.floor(Math.random() * 2)],
@@ -108,18 +95,29 @@ export const mockData = [
     status: ["success", "failure", "pending"][Math.random() > 0.8 ? (Math.random() > 0.5 ? 2 : 1) : 0],
     utr: `UTR${100000 + Math.floor(Math.random() * 900000)}`,
     leadId: `LEAD${10000 + Math.floor(Math.random() * 90000)}`,
-    isRefunded: Math.random() > 0.9
+    isRefunded: Math.random() > 0.9,
+    // Add failure reason for failure transactions
+    failureReason: ["Insufficient Funds", "Bank Declined", "Transaction Timeout", "Authentication Failed", "Network Error"][Math.floor(Math.random() * 5)]
   }))
 ];
 
 // Add data ensuring representation for each filter value combination
 export const ensureDataForAllFilterOptions = () => {
   const businessTypes = ["b2c", "b2b", "corporate"];
-  const paymentGateways = ["Razorpay", "PayU", "Stripe", "PayPal"];
+  const paymentGateways = ["Razorpay", "PayU"]; // Keep only Razorpay and PayU
   const banks = ["hdfc", "icici", "sbi", "axis", "kotak"];
-  const paymentMethods = ["creditCard", "debitCard", "netBanking", "upi", "wallet"];
+  const paymentMethods = ["creditCard", "debitCard", "netBanking", "upi", "wallet", "shopse"]; // Add shopse
   const emiTypes = ["standard", "noCost"];
   const statuses = ["success", "failure", "pending"];
+  
+  // Define common failure reasons for better data distribution
+  const failureReasons = [
+    "Insufficient Funds", 
+    "Bank Declined", 
+    "Transaction Timeout", 
+    "Authentication Failed", 
+    "Network Error"
+  ];
 
   // Function to create a sample transaction with specific filter values
   const createSampleTransaction = (bType, gateway, bank, method, emi, status) => ({
@@ -135,7 +133,9 @@ export const ensureDataForAllFilterOptions = () => {
     status: status,
     utr: `UTR${100000 + Math.floor(Math.random() * 900000)}`,
     leadId: `LEAD${10000 + Math.floor(Math.random() * 90000)}`,
-    isRefunded: Math.random() > 0.9
+    isRefunded: Math.random() > 0.9,
+    // Add failure reason for all transactions
+    failureReason: failureReasons[Math.floor(Math.random() * failureReasons.length)]
   });
 
   // Create specific combinations to ensure all filter options have data
@@ -173,7 +173,34 @@ export const ensureDataForAllFilterOptions = () => {
       });
     });
   });
+
+  // Add more failed transactions with each failure reason to ensure good distribution
+  failureReasons.forEach(reason => {
+    for (let i = 0; i < 10; i++) {
+      const gateway = paymentGateways[Math.floor(Math.random() * paymentGateways.length)];
+      const method = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
+      
+      mockData.push({
+        id: `failure_${reason.toLowerCase().replace(/\s+/g, '_')}_${i}`,
+        date: new Date(2024, 4, Math.floor(Math.random() * 30) + 1),
+        lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
+        businessType: businessTypes[Math.floor(Math.random() * businessTypes.length)],
+        paymentGateway: gateway,
+        bank: banks[Math.floor(Math.random() * banks.length)],
+        paymentMethod: method,
+        emiType: (method === "creditCard" || method === "debitCard") && Math.random() > 0.7 ? 
+          emiTypes[Math.floor(Math.random() * 2)] : null,
+        amount: Math.floor(Math.random() * 15000) + 1000,
+        status: "failure",
+        utr: `UTR${100000 + Math.floor(Math.random() * 900000)}`,
+        leadId: `LEAD${10000 + Math.floor(Math.random() * 90000)}`,
+        isRefunded: false,
+        failureReason: reason
+      });
+    }
+  });
 };
 
 // Call the function to populate the data
 ensureDataForAllFilterOptions();
+
