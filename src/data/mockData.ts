@@ -5,7 +5,7 @@ export const mockData = [
   ...Array.from({ length: 30 }, (_, index) => ({
     id: `rp_${1000 + index}`,
     date: new Date(2024, 4, Math.floor(index / 3) + 1),
-    lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
+    lob: ["movies", "events", "activities", "sports", "motor", "health", "life", "SME", "pet", "travel", "fire", "marine"][Math.floor(Math.random() * 12)],
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
     paymentGateway: "Razorpay",
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
@@ -26,7 +26,7 @@ export const mockData = [
   ...Array.from({ length: 25 }, (_, index) => ({
     id: `pu_${2000 + index}`,
     date: new Date(2024, 4, Math.floor(index / 3) + 1),
-    lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
+    lob: ["movies", "events", "activities", "sports", "motor", "health", "life", "SME", "pet", "travel", "fire", "marine"][Math.floor(Math.random() * 12)],
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
     paymentGateway: "PayU",
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
@@ -47,7 +47,7 @@ export const mockData = [
   ...Array.from({ length: 20 }, (_, index) => ({
     id: `sh_${7000 + index}`,
     date: new Date(2024, 4, Math.floor(index / 3) + 1),
-    lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
+    lob: ["movies", "events", "activities", "sports", "motor", "health", "life", "SME", "pet", "travel", "fire", "marine"][Math.floor(Math.random() * 12)],
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
     paymentGateway: ["Razorpay", "PayU"][Math.floor(Math.random() * 2)],
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
@@ -66,7 +66,7 @@ export const mockData = [
   ...Array.from({ length: 15 }, (_, index) => ({
     id: `emi_${8000 + index}`,
     date: new Date(2024, 4, Math.floor(index / 3) + 1),
-    lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
+    lob: ["movies", "events", "activities", "sports", "motor", "health", "life", "SME", "pet", "travel", "fire", "marine"][Math.floor(Math.random() * 12)],
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
     paymentGateway: ["Razorpay", "PayU"][Math.floor(Math.random() * 2)],
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
@@ -84,7 +84,7 @@ export const mockData = [
   ...Array.from({ length: 15 }, (_, index) => ({
     id: `cc_emi_${5000 + index}`,
     date: new Date(2024, 4, Math.floor(index / 3) + 1),
-    lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
+    lob: ["movies", "events", "activities", "sports", "motor", "health", "life", "SME", "pet", "travel", "fire", "marine"][Math.floor(Math.random() * 12)],
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
     paymentGateway: ["Razorpay", "PayU"][Math.floor(Math.random() * 2)],
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
@@ -103,7 +103,7 @@ export const mockData = [
   ...Array.from({ length: 10 }, (_, index) => ({
     id: `dc_emi_${6000 + index}`,
     date: new Date(2024, 4, Math.floor(index / 3) + 1),
-    lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
+    lob: ["movies", "events", "activities", "sports", "motor", "health", "life", "SME", "pet", "travel", "fire", "marine"][Math.floor(Math.random() * 12)],
     businessType: ["b2c", "b2b", "corporate"][Math.floor(Math.random() * 3)],
     paymentGateway: ["Razorpay", "PayU"][Math.floor(Math.random() * 2)],
     bank: ["hdfc", "icici", "sbi", "axis", "kotak"][Math.floor(Math.random() * 5)],
@@ -127,6 +127,8 @@ export const ensureDataForAllFilterOptions = () => {
   const paymentMethods = ["creditCard", "debitCard", "netBanking", "upi", "wallet", "shopse", "emi"]; // Add emi
   const emiTypes = ["standard", "noCost"];
   const statuses = ["success", "failure", "pending"];
+  // Add the new LOB values
+  const lobs = ["motor", "health", "life", "SME", "pet", "travel", "fire", "marine"];
   
   // Define common failure reasons for better data distribution
   const failureReasons = [
@@ -138,10 +140,10 @@ export const ensureDataForAllFilterOptions = () => {
   ];
 
   // Function to create a sample transaction with specific filter values
-  const createSampleTransaction = (bType, gateway, bank, method, emi, status) => ({
+  const createSampleTransaction = (bType, gateway, bank, method, emi, status, lob) => ({
     id: `sample_${Math.random().toString(36).substring(2, 9)}`,
     date: new Date(2024, 4, Math.floor(Math.random() * 30) + 1),
-    lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
+    lob: lob,
     businessType: bType,
     paymentGateway: gateway,
     bank: bank,
@@ -162,29 +164,35 @@ export const ensureDataForAllFilterOptions = () => {
       banks.forEach(bank => {
         paymentMethods.forEach(method => {
           statuses.forEach(status => {
-            // Add a regular transaction for each combination
-            mockData.push(createSampleTransaction(
-              bType, 
-              gateway, 
-              bank, 
-              method, 
-              (method === "creditCard" || method === "debitCard" || method === "emi") && Math.random() > 0.5 ? 
-                emiTypes[Math.floor(Math.random() * 2)] : null,
-              status
-            ));
+            lobs.forEach(lob => {
+              // Add a regular transaction for each combination
+              mockData.push(createSampleTransaction(
+                bType, 
+                gateway, 
+                bank, 
+                method, 
+                (method === "creditCard" || method === "debitCard" || method === "emi") && Math.random() > 0.5 ? 
+                  emiTypes[Math.floor(Math.random() * 2)] : null,
+                status,
+                lob
+              ));
+            });
           });
 
           // For credit and debit cards and EMI, ensure EMI type combinations
           if (method === "creditCard" || method === "debitCard" || method === "emi") {
             emiTypes.forEach(emi => {
-              mockData.push(createSampleTransaction(
-                bType,
-                gateway,
-                bank,
-                method,
-                emi,
-                statuses[Math.floor(Math.random() * 3)]
-              ));
+              lobs.forEach(lob => {
+                mockData.push(createSampleTransaction(
+                  bType,
+                  gateway,
+                  bank,
+                  method,
+                  emi,
+                  statuses[Math.floor(Math.random() * 3)],
+                  lob
+                ));
+              });
             });
           }
         });
@@ -197,11 +205,12 @@ export const ensureDataForAllFilterOptions = () => {
     for (let i = 0; i < 10; i++) {
       const gateway = paymentGateways[Math.floor(Math.random() * paymentGateways.length)];
       const method = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
+      const lob = lobs[Math.floor(Math.random() * lobs.length)];
       
       mockData.push({
         id: `failure_${reason.toLowerCase().replace(/\s+/g, '_')}_${i}`,
         date: new Date(2024, 4, Math.floor(Math.random() * 30) + 1),
-        lob: ["movies", "events", "activities", "sports"][Math.floor(Math.random() * 4)],
+        lob: lob,
         businessType: businessTypes[Math.floor(Math.random() * businessTypes.length)],
         paymentGateway: gateway,
         bank: banks[Math.floor(Math.random() * banks.length)],

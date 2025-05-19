@@ -41,6 +41,9 @@ const Index = () => {
   // Replace selectedLob with businessTypes (multi-select)
   const [businessTypes, setBusinessTypes] = useState<string[]>([]);
   
+  // Add LOB filter state
+  const [lobs, setLobs] = useState<string[]>([]);
+  
   // Convert other filters to multi-select
   const [paymentGateways, setPaymentGateways] = useState<string[]>([]);
   const [banks, setBanks] = useState<string[]>([]);
@@ -103,6 +106,7 @@ const Index = () => {
       
       return (
         includesOrEmpty(businessTypes, item.businessType) &&
+        includesOrEmpty(lobs, item.lob) && // Add LOB filter check
         includesOrEmpty(paymentGateways, item.paymentGateway) &&
         includesOrEmpty(banks, item.bank) &&
         includesOrEmpty(paymentMethods, item.paymentMethod) &&
@@ -118,7 +122,7 @@ const Index = () => {
     });
     
     setFilteredData(filtered);
-  }, [businessTypes, paymentGateways, banks, paymentMethods, emiTypes, paymentStatuses, dateRange]);
+  }, [businessTypes, lobs, paymentGateways, banks, paymentMethods, emiTypes, paymentStatuses, dateRange]);
 
   // Determine what chart metric options to show based on payment status
   const getChartMetricOptions = () => {
@@ -341,11 +345,13 @@ const Index = () => {
   // Reset filters function
   const resetFilters = () => {
     setBusinessTypes([]);
+    setLobs([]);
     setPaymentGateways([]);
     setBanks([]);
     setPaymentMethods([]);
     setEmiTypes([]);
-    setPaymentStatuses([]);
+    // Keep success as the default payment status
+    setPaymentStatuses(["success"]);
     setDateRange({
       from: new Date(2024, 4, 1),
       to: new Date()
@@ -413,7 +419,7 @@ const Index = () => {
               </Popover>
             </div>
 
-            {/* Business Type Filter - Replacing LOB */}
+            {/* Business Type Filter */}
             <div className="space-y-2">
               <Label>Business Type</Label>
               <Select>
@@ -433,6 +439,34 @@ const Index = () => {
                         />
                         <label htmlFor={`business-${type}`} className="text-sm font-medium leading-none cursor-pointer">
                           {type.toUpperCase()}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* LOB Filter */}
+            <div className="space-y-2">
+              <Label>Line of Business</Label>
+              <Select>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder={lobs.length === 0 
+                    ? "All LOBs" 
+                    : `${lobs.length} selected`} />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="space-y-2 p-2">
+                    {["motor", "health", "life", "SME", "pet", "travel", "fire", "marine"].map((lob) => (
+                      <div key={lob} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`lob-${lob}`}
+                          checked={lobs.includes(lob)}
+                          onCheckedChange={() => handleCheckboxToggle(lob, lobs, setLobs)}
+                        />
+                        <label htmlFor={`lob-${lob}`} className="text-sm font-medium leading-none cursor-pointer capitalize">
+                          {lob}
                         </label>
                       </div>
                     ))}
@@ -470,6 +504,25 @@ const Index = () => {
                           />
                           <label htmlFor={`dialog-business-${type}`} className="text-sm leading-none cursor-pointer">
                             {type.toUpperCase()}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* LOB Filter */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Line of Business</Label>
+                    <div className="space-y-2">
+                      {["motor", "health", "life", "SME", "pet", "travel", "fire", "marine"].map((lob) => (
+                        <div key={lob} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`dialog-lob-${lob}`}
+                            checked={lobs.includes(lob)}
+                            onCheckedChange={() => handleCheckboxToggle(lob, lobs, setLobs)}
+                          />
+                          <label htmlFor={`dialog-lob-${lob}`} className="text-sm leading-none cursor-pointer capitalize">
+                            {lob}
                           </label>
                         </div>
                       ))}
