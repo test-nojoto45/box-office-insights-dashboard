@@ -62,7 +62,8 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
     "shopse": "#8B5CF6", // Vivid Purple
     "emi": "#ea384c", // Red
     "default": "#3B82F6", // Default Blue
-    "failure": "#ea384c" // Red for failure
+    "failure": "#ea384c", // Red for failure
+    "Others": "#8E9196", // Neutral Gray for Others category
   };
 
   const chartData = useMemo(() => {
@@ -108,18 +109,59 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       }, {});
       
       // Convert to array and sort by count
-      return Object.values(groupedByReason)
-        .sort((a: any, b: any) => b.count - a.count)
-        .slice(0, 5) // Take top 5
-        .map((item: any) => ({
-          name: item.reason,
-          count: item.count,
-          volume: item.totalAmount,
-          // Calculate failure percentage for each reason
-          failurePercentage: (item.count / failureData.length) * 100,
-          // For tooltip breakdown
-          breakdown: viewType === "gateway" ? item.gateway : item.method
-        }));
+      const sortedData = Object.values(groupedByReason)
+        .sort((a: any, b: any) => b.count - a.count);
+      
+      // Top 5 items
+      const top5 = sortedData.slice(0, 5);
+      
+      // Create "Others" category if there are more than 5 items
+      if (sortedData.length > 5) {
+        const others = sortedData.slice(5).reduce((acc: any, item: any) => {
+          acc.count += item.count;
+          acc.totalAmount += item.totalAmount;
+          
+          // Combine gateway or method data
+          if (viewType === "gateway" && item.gateway) {
+            Object.entries(item.gateway).forEach(([key, value]: [string, any]) => {
+              if (!acc.gateway[key]) {
+                acc.gateway[key] = { count: 0, amount: 0 };
+              }
+              acc.gateway[key].count += value.count;
+              acc.gateway[key].amount += value.amount;
+            });
+          } else if (viewType === "method" && item.method) {
+            Object.entries(item.method).forEach(([key, value]: [string, any]) => {
+              if (!acc.method[key]) {
+                acc.method[key] = { count: 0, amount: 0 };
+              }
+              acc.method[key].count += value.count;
+              acc.method[key].amount += value.amount;
+            });
+          }
+          
+          return acc;
+        }, {
+          reason: "Others",
+          count: 0,
+          totalAmount: 0,
+          gateway: viewType === "gateway" ? {} : null,
+          method: viewType === "method" ? {} : null,
+        });
+        
+        // Add Others to the array
+        top5.push(others);
+      }
+      
+      return top5.map((item: any) => ({
+        name: item.reason,
+        count: item.count,
+        volume: item.totalAmount,
+        // Calculate failure percentage for each reason
+        failurePercentage: (item.count / failureData.length) * 100,
+        // For tooltip breakdown
+        breakdown: viewType === "gateway" ? item.gateway : item.method
+      }));
     }
     
     // Otherwise use original chart logic
@@ -162,8 +204,8 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
         return acc;
       }, {});
 
-      // Convert to array and calculate percentages
-      return Object.values(groupedData).map((group: any) => ({
+      // Convert to array, calculate percentages, and get top 5
+      const dataArray = Object.values(groupedData).map((group: any) => ({
         name: `${group.name} (${group.emiTypeName})`,
         originalName: group.name,
         groupKey: group.groupKey,
@@ -171,6 +213,37 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
         volume: group.totalAmount,
         successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
       }));
+      
+      // Sort by volume
+      const sortedData = dataArray.sort((a: any, b: any) => b.volume - a.volume);
+      
+      // Get top 5
+      const top5 = sortedData.slice(0, 5);
+      
+      // Create "Others" category if there are more than 5 items
+      if (sortedData.length > 5) {
+        const others = sortedData.slice(5).reduce((acc: any, item: any) => {
+          acc.volume += item.volume;
+          acc.successCount += item.successRate * item.volume / 100; // Weighted success rate
+          acc.totalVolume += item.volume;
+          return acc;
+        }, {
+          name: "Others",
+          originalName: "Others",
+          groupKey: "Others",
+          volume: 0,
+          successCount: 0,
+          totalVolume: 0,
+        });
+        
+        others.successRate = others.totalVolume > 0 ? 
+          (others.successCount / others.totalVolume) * 100 : 0;
+        
+        // Add Others to the array
+        top5.push(others);
+      }
+      
+      return top5;
     } else {
       // Original grouping logic when no EMI filters are applied
       const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
@@ -196,13 +269,43 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
         return acc;
       }, {});
       
-      // Convert to array and calculate percentages
-      return Object.values(groupedData).map((group: any) => ({
+      // Convert to array, calculate percentages
+      const dataArray = Object.values(groupedData).map((group: any) => ({
         name: viewType === "method" ? formatMethodName(group.name) : group.name,
         groupKey: group.name, // Store original key for color mapping
         volume: group.totalAmount,
         successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
       }));
+      
+      // Sort by volume
+      const sortedData = dataArray.sort((a: any, b: any) => b.volume - a.volume);
+      
+      // Get top 5
+      const top5 = sortedData.slice(0, 5);
+      
+      // Create "Others" category if there are more than 5 items
+      if (sortedData.length > 5) {
+        const others = sortedData.slice(5).reduce((acc: any, item: any) => {
+          acc.volume += item.volume;
+          acc.successCount += item.successRate * item.volume / 100; // Weighted success rate
+          acc.totalVolume += item.volume;
+          return acc;
+        }, {
+          name: "Others",
+          groupKey: "Others",
+          volume: 0,
+          successCount: 0,
+          totalVolume: 0,
+        });
+        
+        others.successRate = others.totalVolume > 0 ? 
+          (others.successCount / others.totalVolume) * 100 : 0;
+        
+        // Add Others to the array
+        top5.push(others);
+      }
+      
+      return top5;
     }
   }, [data, viewType, emiTypes, showFailureReasons]);
 
@@ -251,7 +354,13 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
             </p>
           )}
           {/* Show breakdown for failure reasons */}
-          {showFailureReasons && payload[0].payload.breakdown && (
+          {showFailureReasons && payload[0].payload.breakdown && label === "Others" && (
+            <div className="mt-2 border-t pt-1 text-xs">
+              <p className="font-medium">Includes multiple failure reasons</p>
+            </div>
+          )}
+          {/* Show breakdown for failure reasons */}
+          {showFailureReasons && payload[0].payload.breakdown && label !== "Others" && (
             <div className="mt-2 border-t pt-1 text-xs">
               <p className="font-medium">Breakdown:</p>
               {Object.entries(payload[0].payload.breakdown).map(([key, value]: [string, any]) => (
@@ -260,6 +369,12 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
                 </p>
               ))}
             </div>
+          )}
+          {/* Add extra info for Others category */}
+          {label === "Others" && !showFailureReasons && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Combines all remaining entries beyond top 5
+            </p>
           )}
         </div>
       );
@@ -289,6 +404,10 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
   // Get the color for a data item based on its gateway or method
   const getBarColor = (entry: any) => {
     if (showFailureReasons) return colorMap.failure;
+    
+    if (entry.name === "Others" || entry.groupKey === "Others") {
+      return colorMap.Others;
+    }
     
     const key = entry.groupKey;
     return colorMap[key] || colorMap.default;
