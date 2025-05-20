@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Download, ChevronDown, Plus, X, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -8,7 +9,6 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHe
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -46,7 +46,7 @@ const Index = () => {
   
   // Convert other filters to multi-select
   const [paymentGateways, setPaymentGateways] = useState<string[]>([]);
-  const [banks, setBanks] = useState<string[]>([]);
+  const [insurers, setInsurers] = useState<string[]>([]); // Changed from banks to insurers
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [emiTypes, setEmiTypes] = useState<string[]>([]);
   // Set "success" as the default selected payment status
@@ -85,18 +85,37 @@ const Index = () => {
     
     // Apply each filter with multi-select logic
     filtered = filtered.filter(item => {
-      // Check if EMI types are selected and payment methods are compatible
-      const emiSelected = emiTypes.length > 0;
+      // First, handle shopse as a special EMI type
+      const shopseSelected = emiTypes.includes("shopse");
+      
+      // If shopse is selected, only apply LOB filter to shopse transactions
+      if (shopseSelected && item.emiType === "shopse") {
+        return includesOrEmpty(lobs, item.lob) && 
+               includesOrEmpty(businessTypes, item.businessType) &&
+               includesOrEmpty(paymentGateways, item.paymentGateway) &&
+               includesOrEmpty(insurers, item.insurer) &&
+               includesOrEmpty(paymentStatuses, item.status);
+      }
+      
+      // If shopse is selected but this item is not shopse, exclude it
+      if (shopseSelected && item.emiType !== "shopse") {
+        return false;
+      }
+      
+      // For non-shopse EMI types
+      const emiSelected = emiTypes.length > 0 && !shopseSelected;
       const cardOrEmiSelected = paymentMethods.includes("creditCard") || 
-                               paymentMethods.includes("debitCard") ||
-                               paymentMethods.includes("emi");
+                              paymentMethods.includes("debitCard") ||
+                              paymentMethods.includes("emi");
       const isEmiCompatible = !emiSelected || 
         ((item.paymentMethod === "creditCard" || 
           item.paymentMethod === "debitCard" ||
           item.paymentMethod === "emi") && 
-         includesOrEmpty(emiTypes, item.emiType));
+          includesOrEmpty(emiTypes, item.emiType) && 
+          item.emiType !== "shopse");
       
-      // If EMI types are selected but no card/emi payment methods are selected, filter out non-compatible items
+      // If EMI types (other than shopse) are selected but no card/emi payment methods are selected, 
+      // filter out non-compatible items
       if (emiSelected && !cardOrEmiSelected && 
           item.paymentMethod !== "creditCard" && 
           item.paymentMethod !== "debitCard" &&
@@ -108,7 +127,7 @@ const Index = () => {
         includesOrEmpty(businessTypes, item.businessType) &&
         includesOrEmpty(lobs, item.lob) && // Add LOB filter check
         includesOrEmpty(paymentGateways, item.paymentGateway) &&
-        includesOrEmpty(banks, item.bank) &&
+        includesOrEmpty(insurers, item.insurer) && // Changed from banks to insurers
         includesOrEmpty(paymentMethods, item.paymentMethod) &&
         isEmiCompatible &&
         includesOrEmpty(paymentStatuses, item.status)
@@ -122,7 +141,7 @@ const Index = () => {
     });
     
     setFilteredData(filtered);
-  }, [businessTypes, lobs, paymentGateways, banks, paymentMethods, emiTypes, paymentStatuses, dateRange]);
+  }, [businessTypes, lobs, paymentGateways, insurers, paymentMethods, emiTypes, paymentStatuses, dateRange]);
 
   // Determine what chart metric options to show based on payment status
   const getChartMetricOptions = () => {
@@ -164,6 +183,7 @@ const Index = () => {
     switch (emiType) {
       case "standard": return "Standard EMI";
       case "noCost": return "No Cost EMI";
+      case "shopse": return "Shopse";
       default: return "N/A";
     }
   };
@@ -176,7 +196,6 @@ const Index = () => {
       case "netBanking": return "Net Banking";
       case "upi": return "UPI";
       case "wallet": return "Wallet";
-      case "shopse": return "Shopse";
       case "emi": return "EMI";
       default: return method;
     }
@@ -186,19 +205,51 @@ const Index = () => {
   const prepareSummaryData = () => {
     const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
     const showFailures = paymentStatuses.length === 1 && paymentStatuses.includes("failure");
+    const shopseSelected = emiTypes.includes("shopse");
     
     // Create a summary object based on the view type (gateway or method)
     const summary: Record<string, PaymentSummary | Record<string, PaymentSummary>> = {};
+
+    // Special case for shopse
+    if (shopseSelected) {
+      // Only include shopse transactions
+      const shopseData = filteredData.filter(item => item.emiType === "shopse");
+      
+      // Group by payment method/gateway
+      shopseData.forEach(item => {
+        const key = item[groupBy];
+        
+        if (!summary[key]) {
+          summary[key] = {
+            totalTransactions: 0,
+            successCount: 0,
+            failureCount: 0,
+            refundCount: 0,
+            totalVolume: 0,
+            refundVolume: 0,
+            emiType: "shopse",
+            paymentGateway: viewType === "method" ? item.paymentGateway : undefined
+          };
+        }
+        
+        const summaryItem = summary[key] as PaymentSummary;
+        summaryItem.totalTransactions += 1;
+        summaryItem.totalVolume += item.amount;
+        
+        if (item.status === "success") summaryItem.successCount += 1;
+        if (item.status === "failure") summaryItem.failureCount += 1;
+        if (item.isRefunded) {
+          summaryItem.refundCount += 1;
+          summaryItem.refundVolume += item.amount;
+        }
+      });
+      
+      return summary as Record<string, PaymentSummary>;
+    }
     
     // Check if we need to group by EMI type
     const shouldGroupByEmi = emiTypes.length > 0 && 
-      filteredData.some(item => 
-        (item.paymentMethod === "creditCard" || 
-         item.paymentMethod === "debitCard" ||
-         item.paymentMethod === "emi") && 
-        item.emiType && 
-        emiTypes.includes(item.emiType)
-      );
+      filteredData.some(item => item.emiType && emiTypes.includes(item.emiType) && item.emiType !== "shopse");
 
     if (shouldGroupByEmi) {
       // Group by payment method/gateway and then by EMI type
@@ -214,7 +265,7 @@ const Index = () => {
         }
         
         // Skip items with no EMI type or not matching selected EMI types
-        if (emiTypes.length > 0 && (!item.emiType || !emiTypes.includes(item.emiType))) {
+        if (emiTypes.length > 0 && (!item.emiType || !emiTypes.includes(item.emiType) || item.emiType === "shopse")) {
           return;
         }
 
@@ -328,14 +379,42 @@ const Index = () => {
 
   // Helper function to handle EMI type selection
   const handleEmiTypeToggle = (emiType: string) => {
-    // Check if we have credit or debit card in payment methods
-    const hasCardOrEmiMethod = paymentMethods.includes("creditCard") || 
-                           paymentMethods.includes("debitCard") ||
-                           paymentMethods.includes("emi");
+    // If Shopse is selected, we'll need to clear other EMI types and payment methods
+    if (emiType === "shopse" && !emiTypes.includes("shopse")) {
+      // Clear other EMI types and set only shopse
+      setEmiTypes(["shopse"]);
+      return;
+    }
     
-    // If EMI is being selected and no card payment method is selected, auto-select credit card
-    if (!hasCardOrEmiMethod && !emiTypes.includes(emiType)) {
-      setPaymentMethods(prev => [...prev, "creditCard"]);
+    // If another EMI type is selected while shopse is active, clear shopse
+    if (emiType !== "shopse" && emiTypes.includes("shopse")) {
+      const newEmiTypes = [emiType];
+      setEmiTypes(newEmiTypes);
+      
+      // Check if we have credit or debit card in payment methods
+      const hasCardOrEmiMethod = paymentMethods.includes("creditCard") || 
+                             paymentMethods.includes("debitCard") ||
+                             paymentMethods.includes("emi");
+      
+      // If no card payment method is selected, auto-select credit card
+      if (!hasCardOrEmiMethod) {
+        setPaymentMethods(prev => [...prev, "creditCard"]);
+      }
+      
+      return;
+    }
+    
+    // Normal case: not handling shopse
+    if (emiType !== "shopse") {
+      // Check if we have credit or debit card in payment methods
+      const hasCardOrEmiMethod = paymentMethods.includes("creditCard") || 
+                             paymentMethods.includes("debitCard") ||
+                             paymentMethods.includes("emi");
+      
+      // If EMI is being selected and no card payment method is selected, auto-select credit card
+      if (!hasCardOrEmiMethod && !emiTypes.includes(emiType)) {
+        setPaymentMethods(prev => [...prev, "creditCard"]);
+      }
     }
     
     // Toggle the EMI type
@@ -347,7 +426,7 @@ const Index = () => {
     setBusinessTypes([]);
     setLobs([]);
     setPaymentGateways([]);
-    setBanks([]);
+    setInsurers([]); // Changed from banks to insurers
     setPaymentMethods([]);
     setEmiTypes([]);
     // Keep success as the default payment status
@@ -548,66 +627,72 @@ const Index = () => {
                     </div>
                   </div>
                   
-                  {/* Bank */}
+                  {/* Insurers - Replacing Banks */}
                   <div className="space-y-3">
-                    <Label className="text-sm font-medium">Bank</Label>
+                    <Label className="text-sm font-medium">Insurer</Label>
                     <div className="space-y-2">
-                      {["hdfc", "icici", "sbi", "axis", "kotak"].map((bank) => (
-                        <div key={bank} className="flex items-center space-x-2">
+                      {["Care", "ICICI", "Magma", "Zuno", "HDFC", "Niva Bupa", "SRGI"].map((insurer) => (
+                        <div key={insurer} className="flex items-center space-x-2">
                           <Checkbox 
-                            id={`dialog-bank-${bank}`}
-                            checked={banks.includes(bank)}
-                            onCheckedChange={() => handleCheckboxToggle(bank, banks, setBanks)}
+                            id={`dialog-insurer-${insurer}`}
+                            checked={insurers.includes(insurer)}
+                            onCheckedChange={() => handleCheckboxToggle(insurer, insurers, setInsurers)}
                           />
-                          <label htmlFor={`dialog-bank-${bank}`} className="text-sm leading-none cursor-pointer">
-                            {bank.toUpperCase()}
+                          <label htmlFor={`dialog-insurer-${insurer}`} className="text-sm leading-none cursor-pointer">
+                            {insurer}
                           </label>
                         </div>
                       ))}
                     </div>
                   </div>
                   
-                  {/* Payment Method - Updated to include Shopse and EMI */}
+                  {/* Payment Method - Updated to remove Shopse */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Method</Label>
                     <div className="space-y-2">
-                      {["creditCard", "debitCard", "netBanking", "upi", "wallet", "shopse", "emi"].map((method) => (
+                      {["creditCard", "debitCard", "netBanking", "upi", "wallet", "emi"].map((method) => (
                         <div key={method} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`dialog-method-${method}`}
                             checked={paymentMethods.includes(method)}
                             onCheckedChange={() => handleCheckboxToggle(method, paymentMethods, setPaymentMethods)}
+                            disabled={emiTypes.includes("shopse")}
                           />
                           <label htmlFor={`dialog-method-${method}`} className="text-sm leading-none cursor-pointer">
                             {formatMethodName(method)}
                           </label>
                         </div>
                       ))}
+                      {emiTypes.includes("shopse") && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Payment methods disabled when Shopse is selected
+                        </p>
+                      )}
                     </div>
                   </div>
                   
-                  {/* EMI Type - Updated options */}
+                  {/* EMI Type - Updated options including Shopse */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">EMI Type</Label>
                     <div className="space-y-2">
-                      {["standard", "noCost"].map((emi) => (
+                      {["standard", "noCost", "shopse"].map((emi) => (
                         <div key={emi} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`dialog-emi-${emi}`}
                             checked={emiTypes.includes(emi)}
                             onCheckedChange={() => handleEmiTypeToggle(emi)}
-                            disabled={paymentMethods.length > 0 && 
-                              !paymentMethods.includes("creditCard") && 
-                              !paymentMethods.includes("debitCard") &&
-                              !paymentMethods.includes("emi")}
+                            disabled={emi !== "shopse" && emiTypes.includes("shopse") ||
+                                     emi === "shopse" && emiTypes.length > 0 && !emiTypes.includes("shopse")}
                           />
                           <label htmlFor={`dialog-emi-${emi}`} className="text-sm leading-none cursor-pointer">
-                            {emi === "standard" ? "Standard" : "No Cost"}
+                            {emi === "standard" ? "Standard" : emi === "noCost" ? "No Cost" : "Shopse"}
                           </label>
                         </div>
                       ))}
                       <p className="text-xs text-muted-foreground mt-1">
-                        EMI types only apply to credit/debit cards and EMI method
+                        {emiTypes.includes("shopse") ? 
+                          "Shopse is exclusive and applied to any payment method" : 
+                          "Standard/No Cost EMI types only apply to credit/debit cards and EMI method"}
                       </p>
                     </div>
                   </div>

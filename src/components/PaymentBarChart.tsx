@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, TooltipProps, Cell } from "recharts";
 
@@ -32,7 +31,6 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       case "netBanking": return "Net Banking";
       case "upi": return "UPI";
       case "wallet": return "Wallet";
-      case "shopse": return "Shopse";
       case "emi": return "EMI";
       default: return method;
     }
@@ -43,6 +41,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
     switch (emiType) {
       case "standard": return "Standard EMI";
       case "noCost": return "No Cost EMI";
+      case "shopse": return "Shopse";
       default: return emiType;
     }
   };
@@ -164,10 +163,81 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       }));
     }
     
+    // Check if we need to handle shopse as a special case
+    const hasShopseFilter = emiTypes.includes("shopse");
+    
+    // Special handling for Shopse
+    if (hasShopseFilter) {
+      // Filter to only Shopse transactions
+      const shopseData = data.filter(item => item.emiType === "shopse");
+      
+      // Group by gateway or method
+      const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
+      
+      const groupedData = shopseData.reduce((acc, item) => {
+        const key = item[groupBy];
+        
+        if (!acc[key]) {
+          acc[key] = {
+            name: key,
+            totalAmount: 0,
+            successCount: 0,
+            totalCount: 0,
+          };
+        }
+        
+        acc[key].totalAmount += item.amount;
+        acc[key].totalCount += 1;
+        if (item.status === "success") {
+          acc[key].successCount += 1;
+        }
+        
+        return acc;
+      }, {});
+      
+      // Convert to array, calculate percentages
+      const dataArray = Object.values(groupedData).map((group: any) => ({
+        name: viewType === "method" ? formatMethodName(group.name) : group.name,
+        groupKey: group.name, // Store original key for color mapping
+        volume: group.totalAmount,
+        successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
+      }));
+      
+      // Sort by volume
+      const sortedData = dataArray.sort((a: any, b: any) => b.volume - a.volume);
+      
+      // Get top 5
+      const top5 = sortedData.slice(0, 5);
+      
+      // Create "Others" category if there are more than 5 items
+      if (sortedData.length > 5) {
+        const others = sortedData.slice(5).reduce((acc: any, item: any) => {
+          acc.volume += item.volume;
+          acc.successCount += item.successRate * item.volume / 100; // Weighted success rate
+          acc.totalVolume += item.volume;
+          return acc;
+        }, {
+          name: "Others",
+          groupKey: "Others",
+          volume: 0,
+          successCount: 0,
+          totalVolume: 0,
+        });
+        
+        others.successRate = others.totalVolume > 0 ? 
+          (others.successCount / others.totalVolume) * 100 : 0;
+        
+        // Add Others to the array
+        top5.push(others);
+      }
+      
+      return top5;
+    }
+    
     // Otherwise use original chart logic
     // Check if we need to group by EMI type
     const shouldGroupByEmi = emiTypes.length > 0 && 
-      data.some(item => item.emiType && emiTypes.includes(item.emiType));
+      data.some(item => item.emiType && emiTypes.includes(item.emiType) && item.emiType !== "shopse");
     
     // If EMI types are selected, we'll group differently
     if (shouldGroupByEmi) {
@@ -175,7 +245,8 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       const emiFilteredData = data.filter(item => 
         (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard" || item.paymentMethod === "emi") && 
         item.emiType && 
-        emiTypes.includes(item.emiType)
+        emiTypes.includes(item.emiType) &&
+        item.emiType !== "shopse"
       );
       
       // Group by EMI type and payment method/gateway
