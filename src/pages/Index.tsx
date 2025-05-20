@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Download, ChevronDown, Plus, X, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -11,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import PaymentBarChart from "@/components/PaymentBarChart";
 import AlertModal from "@/components/AlertModal";
@@ -125,10 +125,10 @@ const Index = () => {
       
       return (
         includesOrEmpty(businessTypes, item.businessType) &&
-        includesOrEmpty(lobs, item.lob) && // Add LOB filter check
-        includesOrEmpty(paymentGateways, item.paymentGateway) &&
-        includesOrEmpty(insurers, item.insurer) && // Changed from banks to insurers
-        includesOrEmpty(paymentMethods, item.paymentMethod) &&
+        includesOrEmpty(lobs, item.lob) // Add LOB filter check
+        && includesOrEmpty(paymentGateways, item.paymentGateway) &&
+        includesOrEmpty(insurers, item.insurer) // Changed from banks to insurers
+        && includesOrEmpty(paymentMethods, item.paymentMethod) &&
         isEmiCompatible &&
         includesOrEmpty(paymentStatuses, item.status)
       );
