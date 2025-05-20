@@ -94,7 +94,8 @@ const Index = () => {
                includesOrEmpty(businessTypes, item.businessType) &&
                includesOrEmpty(paymentGateways, item.paymentGateway) &&
                includesOrEmpty(insurers, item.insurer) &&
-               includesOrEmpty(paymentStatuses, item.status);
+               includesOrEmpty(paymentStatuses, item.status) &&
+               item.paymentMethod === "emi"; // Ensure payment method is "emi" for shopse
       }
       
       // If shopse is selected but this item is not shopse, exclude it
@@ -379,10 +380,12 @@ const Index = () => {
 
   // Helper function to handle EMI type selection
   const handleEmiTypeToggle = (emiType: string) => {
-    // If Shopse is selected, we'll need to clear other EMI types and payment methods
+    // If Shopse is selected, we'll need to clear other EMI types and set payment method to "emi"
     if (emiType === "shopse" && !emiTypes.includes("shopse")) {
       // Clear other EMI types and set only shopse
       setEmiTypes(["shopse"]);
+      // Set payment method to only "emi"
+      setPaymentMethods(["emi"]);
       return;
     }
     
@@ -419,6 +422,27 @@ const Index = () => {
     
     // Toggle the EMI type
     handleCheckboxToggle(emiType, emiTypes, setEmiTypes);
+  };
+
+  // Helper function to handle payment method toggle with shopse compatibility
+  const handlePaymentMethodToggle = (method: string) => {
+    // If shopse is selected, only allow "emi" as payment method
+    if (emiTypes.includes("shopse")) {
+      if (method === "emi") {
+        // Always keep "emi" selected when shopse is active
+        if (paymentMethods.includes("emi")) {
+          return; // Don't allow deselecting "emi" when shopse is active
+        } else {
+          setPaymentMethods(["emi"]);
+        }
+      } else {
+        // Don't allow other payment methods when shopse is selected
+        return;
+      }
+    } else {
+      // Normal toggle behavior for other cases
+      handleCheckboxToggle(method, paymentMethods, setPaymentMethods);
+    }
   };
 
   // Reset filters function
@@ -646,7 +670,7 @@ const Index = () => {
                     </div>
                   </div>
                   
-                  {/* Payment Method - Updated to remove Shopse */}
+                  {/* Payment Method - Updated to handle shopse constraint */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Method</Label>
                     <div className="space-y-2">
@@ -655,8 +679,8 @@ const Index = () => {
                           <Checkbox 
                             id={`dialog-method-${method}`}
                             checked={paymentMethods.includes(method)}
-                            onCheckedChange={() => handleCheckboxToggle(method, paymentMethods, setPaymentMethods)}
-                            disabled={emiTypes.includes("shopse")}
+                            onCheckedChange={() => handlePaymentMethodToggle(method)}
+                            disabled={emiTypes.includes("shopse") && method !== "emi"}
                           />
                           <label htmlFor={`dialog-method-${method}`} className="text-sm leading-none cursor-pointer">
                             {formatMethodName(method)}
@@ -665,13 +689,13 @@ const Index = () => {
                       ))}
                       {emiTypes.includes("shopse") && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          Payment methods disabled when Shopse is selected
+                          Only EMI payment method allowed with Shopse
                         </p>
                       )}
                     </div>
                   </div>
                   
-                  {/* EMI Type - Updated options including Shopse */}
+                  {/* EMI Type - Updated to handle shopse payment method constraint */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">EMI Type</Label>
                     <div className="space-y-2">
@@ -691,7 +715,7 @@ const Index = () => {
                       ))}
                       <p className="text-xs text-muted-foreground mt-1">
                         {emiTypes.includes("shopse") ? 
-                          "Shopse is exclusive and applied to any payment method" : 
+                          "Shopse requires EMI payment method" : 
                           "Standard/No Cost EMI types only apply to credit/debit cards and EMI method"}
                       </p>
                     </div>
