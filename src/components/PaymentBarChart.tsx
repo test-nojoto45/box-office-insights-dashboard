@@ -4,7 +4,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 interface PaymentBarChartProps {
   data: any[];
   viewType: string;
-  chartMetric: string;
+  chartMetric: string; // Now accepts "percentVolume" as a value
   emiTypes?: string[]; // Optional EMI types
   paymentStatuses?: string[]; // Add payment statuses prop
 }
@@ -123,19 +123,19 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
           // Combine gateway or method data
           if (viewType === "gateway" && item.gateway) {
             Object.entries(item.gateway).forEach(([key, value]: [string, any]) => {
-              if (!acc.gateway[key]) {
-                acc.gateway[key] = { count: 0, amount: 0 };
+              if (!acc[key]) {
+                acc[key] = { count: 0, amount: 0 };
               }
-              acc.gateway[key].count += value.count;
-              acc.gateway[key].amount += value.amount;
+              acc[key].count += value.count;
+              acc[key].amount += value.amount;
             });
           } else if (viewType === "method" && item.method) {
             Object.entries(item.method).forEach(([key, value]: [string, any]) => {
-              if (!acc.method[key]) {
-                acc.method[key] = { count: 0, amount: 0 };
+              if (!acc[key]) {
+                acc[key] = { count: 0, amount: 0 };
               }
-              acc.method[key].count += value.count;
-              acc.method[key].amount += value.amount;
+              acc[key].count += value.count;
+              acc[key].amount += value.amount;
             });
           }
           
@@ -163,12 +163,15 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       }));
     }
     
+    // Calculate total volume for percentage calculations
+    const totalVolumeProcessed = data.reduce((sum, item) => sum + item.amount, 0);
+    
     // Check if we need to handle shopse as a special case
     const hasShopseFilter = emiTypes.includes("shopse");
     
     // Special handling for Shopse
     if (hasShopseFilter) {
-      // Filter to only Shopse transactions
+      // Only include shopse transactions
       const shopseData = data.filter(item => item.emiType === "shopse");
       
       // Group by gateway or method
@@ -200,6 +203,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
         name: viewType === "method" ? formatMethodName(group.name) : group.name,
         groupKey: group.name, // Store original key for color mapping
         volume: group.totalAmount,
+        volumePercentage: totalVolumeProcessed > 0 ? (group.totalAmount / totalVolumeProcessed) * 100 : 0,
         successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
       }));
       
@@ -213,6 +217,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       if (sortedData.length > 5) {
         const others = sortedData.slice(5).reduce((acc: any, item: any) => {
           acc.volume += item.volume;
+          acc.volumePercentage += item.volumePercentage;
           acc.successCount += item.successRate * item.volume / 100; // Weighted success rate
           acc.totalVolume += item.volume;
           return acc;
@@ -220,6 +225,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
           name: "Others",
           groupKey: "Others",
           volume: 0,
+          volumePercentage: 0,
           successCount: 0,
           totalVolume: 0,
         });
@@ -282,6 +288,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
         groupKey: group.groupKey,
         emiType: group.emiType,
         volume: group.totalAmount,
+        volumePercentage: totalVolumeProcessed > 0 ? (group.totalAmount / totalVolumeProcessed) * 100 : 0,
         successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
       }));
       
@@ -295,6 +302,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       if (sortedData.length > 5) {
         const others = sortedData.slice(5).reduce((acc: any, item: any) => {
           acc.volume += item.volume;
+          acc.volumePercentage += item.volumePercentage;
           acc.successCount += item.successRate * item.volume / 100; // Weighted success rate
           acc.totalVolume += item.volume;
           return acc;
@@ -303,6 +311,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
           originalName: "Others",
           groupKey: "Others",
           volume: 0,
+          volumePercentage: 0,
           successCount: 0,
           totalVolume: 0,
         });
@@ -345,6 +354,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
         name: viewType === "method" ? formatMethodName(group.name) : group.name,
         groupKey: group.name, // Store original key for color mapping
         volume: group.totalAmount,
+        volumePercentage: totalVolumeProcessed > 0 ? (group.totalAmount / totalVolumeProcessed) * 100 : 0,
         successRate: group.totalCount > 0 ? (group.successCount / group.totalCount) * 100 : 0,
       }));
       
@@ -358,6 +368,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
       if (sortedData.length > 5) {
         const others = sortedData.slice(5).reduce((acc: any, item: any) => {
           acc.volume += item.volume;
+          acc.volumePercentage += item.volumePercentage;
           acc.successCount += item.successRate * item.volume / 100; // Weighted success rate
           acc.totalVolume += item.volume;
           return acc;
@@ -365,6 +376,7 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
           name: "Others",
           groupKey: "Others",
           volume: 0,
+          volumePercentage: 0,
           successCount: 0,
           totalVolume: 0,
         });
@@ -383,19 +395,19 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
   // Determine what to display based on chartMetric and failure status
   const dataKey = useMemo(() => {
     if (showFailureReasons) {
-      return chartMetric === "volume" ? "volume" : "failurePercentage";
+      return chartMetric === "percentVolume" ? "volumePercentage" : "failurePercentage";
     } else {
-      return chartMetric === "volume" ? "volume" : "successRate";
+      return chartMetric === "percentVolume" ? "volumePercentage" : "successRate";
     }
   }, [showFailureReasons, chartMetric]);
   
   // Format for the tooltip
   const formatTooltip = (value: number, key: string) => {
-    if (key === "failurePercentage") {
+    if (key === "failurePercentage" || key === "volumePercentage" || key === "successRate") {
       return `${value.toFixed(1)}%`;
     } else if (key === "count") {
       return `${value} Transactions`;
-    } else if (chartMetric === "volume" || key === "volume") {
+    } else if (key === "volume") {
       if (value >= 10000000) {
         return `₹${(value / 10000000).toFixed(2)} Cr`;
       } else if (value >= 100000) {
@@ -419,6 +431,12 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
               {entry.name}: {formatTooltip(entry.value, entry.dataKey)}
             </p>
           ))}
+          {/* Show actual volume in tooltip when displaying percentage */}
+          {payload[0].payload.volume && dataKey === "volumePercentage" && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Volume: {formatTooltip(payload[0].payload.volume, "volume")}
+            </p>
+          )}
           {payload[0].payload.emiType && (
             <p className="text-xs text-muted-foreground mt-1">
               EMI Type: {formatEmiTypeName(payload[0].payload.emiType)}
@@ -455,22 +473,22 @@ const PaymentBarChart: React.FC<PaymentBarChartProps> = ({
 
   const barFill = useMemo(() => {
     if (showFailureReasons) return "#EF4444"; // Red for failure reasons
-    return chartMetric === "volume" ? "#3B82F6" : "#10B981"; // Blue for volume, green for success rate
-  }, [showFailureReasons, chartMetric]);
+    return "#3B82F6"; // Blue for volume percentage
+  }, [showFailureReasons]);
 
   const axisLabel = useMemo(() => {
     if (showFailureReasons) {
-      return chartMetric === "volume" ? "Volume (₹)" : "Failure Percentage (%)";
+      return "Failure Percentage (%)";
     }
-    return chartMetric === "volume" ? "Volume (₹)" : "Success Rate (%)";
-  }, [showFailureReasons, chartMetric]);
+    return "Percentage of Volume Processed (%)";
+  }, [showFailureReasons]);
 
   const chartTitle = useMemo(() => {
     if (showFailureReasons) {
-      return chartMetric === "volume" ? "Transaction Volume" : "Failure Percentage";
+      return "Failure Percentage";
     }
-    return chartMetric === "volume" ? "Transaction Volume" : "Success Rate";
-  }, [showFailureReasons, chartMetric]);
+    return "Percentage of Volume Processed";
+  }, [showFailureReasons]);
 
   // Get the color for a data item based on its gateway or method
   const getBarColor = (entry: any) => {

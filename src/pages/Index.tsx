@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import PaymentBarChart from "@/components/PaymentBarChart";
-import AlertModal from "@/components/AlertModal";
 import { format } from "date-fns";
 import { mockData } from "@/data/mockData";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,6 +26,7 @@ interface PaymentSummary {
   refundCount: number;
   totalVolume: number;
   refundVolume: number;
+  policyCount: number; // Added new field for policy count
   emiType?: string;
   paymentGateway?: string;
 }
@@ -38,10 +38,10 @@ const Index = () => {
     to: new Date()
   });
   
-  // Convert multi-select to single-select for these filters
-  const [businessType, setBusinessType] = useState<string | null>(null); // Changed from empty string to null
-  const [lob, setLob] = useState<string | null>(null); // Changed from empty string to null
-  const [insurer, setInsurer] = useState<string | null>(null); // Changed from empty string to null
+  // Single-select filters
+  const [businessType, setBusinessType] = useState<string | null>(null);
+  const [lob, setLob] = useState<string | null>(null);
+  const [insurer, setInsurer] = useState<string | null>(null);
   
   // Keep these as multi-select
   const [paymentGateways, setPaymentGateways] = useState<string[]>([]);
@@ -51,10 +51,8 @@ const Index = () => {
   
   // State for view toggle
   const [viewType, setViewType] = useState("gateway");
-  const [chartMetric, setChartMetric] = useState("volume");
 
-  // State for alerts modal
-  const [showAlertModal, setShowAlertModal] = useState(false);
+  // Removed chartMetric state since we're no longer offering those options
   
   // State for export fields
   const [selectedExportFields, setSelectedExportFields] = useState({
@@ -146,40 +144,15 @@ const Index = () => {
     return arr.length === 0 || arr.includes(value);
   };
 
-  // Determine what chart metric options to show based on payment status
-  const getChartMetricOptions = () => {
-    const showFailures = paymentStatuses.length === 1 && paymentStatuses.includes("failure");
-    
-    if (showFailures) {
-      return (
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="volume">Volume Processed</TabsTrigger>
-          <TabsTrigger value="success">Failure Percentage</TabsTrigger>
-        </TabsList>
-      );
-    }
-    
-    return (
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="volume">Volume Processed</TabsTrigger>
-        <TabsTrigger value="success">Percentage</TabsTrigger>
-      </TabsList>
-    );
-  };
-
   // Calculate metrics
   const totalVolume = filteredData.reduce((sum, item) => sum + item.amount, 0);
   const successCount = filteredData.filter(item => item.status === "success").length;
   const failureCount = filteredData.filter(item => item.status === "failure").length;
-  const refundCount = filteredData.filter(item => item.isRefunded).length;
-  
   const successPercentage = filteredData.length > 0 ? (successCount / filteredData.length) * 100 : 0;
   const failurePercentage = filteredData.length > 0 ? (failureCount / filteredData.length) * 100 : 0;
-  const refundPercentage = successCount > 0 ? (refundCount / successCount) * 100 : 0;
-
-  const refundVolume = filteredData
-    .filter(item => item.isRefunded)
-    .reduce((sum, item) => sum + item.amount, 0);
+  
+  // Calculate policy count - assume each transaction represents a policy
+  const policyCount = filteredData.length;
 
   // Format EMI type name for display
   const formatEmiTypeName = (emiType: string) => {
@@ -204,177 +177,41 @@ const Index = () => {
     }
   };
 
-  // Modified to include EMI type and payment gateway in summary
+  // Modified to include policy count in summary
   const prepareSummaryData = () => {
     const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
-    const showFailures = paymentStatuses.length === 1 && paymentStatuses.includes("failure");
-    const shopseSelected = emiTypes.includes("shopse");
+    const summary: Record<string, PaymentSummary> = {};
     
-    // Create a summary object based on the view type (gateway or method)
-    const summary: Record<string, PaymentSummary | Record<string, PaymentSummary>> = {};
-
-    // Special case for shopse
-    if (shopseSelected) {
-      // Only include shopse transactions
-      const shopseData = filteredData.filter(item => item.emiType === "shopse");
+    filteredData.forEach(item => {
+      const key = item[groupBy];
       
-      // Group by payment method/gateway
-      shopseData.forEach(item => {
-        const key = item[groupBy];
-        
-        if (!summary[key]) {
-          summary[key] = {
-            totalTransactions: 0,
-            successCount: 0,
-            failureCount: 0,
-            refundCount: 0,
-            totalVolume: 0,
-            refundVolume: 0,
-            emiType: "shopse",
-            paymentGateway: viewType === "method" ? item.paymentGateway : undefined
-          };
-        }
-        
-        const summaryItem = summary[key] as PaymentSummary;
-        summaryItem.totalTransactions += 1;
-        summaryItem.totalVolume += item.amount;
-        
-        if (item.status === "success") summaryItem.successCount += 1;
-        if (item.status === "failure") summaryItem.failureCount += 1;
-        if (item.isRefunded) {
-          summaryItem.refundCount += 1;
-          summaryItem.refundVolume += item.amount;
-        }
-      });
+      if (!summary[key]) {
+        summary[key] = {
+          totalTransactions: 0,
+          successCount: 0,
+          failureCount: 0,
+          refundCount: 0,
+          totalVolume: 0,
+          refundVolume: 0,
+          policyCount: 0, // Initialize policy count
+          paymentGateway: viewType === "method" ? item.paymentGateway : undefined
+        };
+      }
       
-      return summary as Record<string, PaymentSummary>;
-    }
+      const summaryItem = summary[key];
+      summaryItem.totalTransactions += 1;
+      summaryItem.totalVolume += item.amount;
+      summaryItem.policyCount += 1; // Increment policy count
+      
+      if (item.status === "success") summaryItem.successCount += 1;
+      if (item.status === "failure") summaryItem.failureCount += 1;
+      if (item.isRefunded) {
+        summaryItem.refundCount += 1;
+        summaryItem.refundVolume += item.amount;
+      }
+    });
     
-    // Check if we need to group by EMI type
-    const shouldGroupByEmi = emiTypes.length > 0 && 
-      filteredData.some(item => item.emiType && emiTypes.includes(item.emiType) && item.emiType !== "shopse");
-
-    if (shouldGroupByEmi) {
-      // Group by payment method/gateway and then by EMI type
-      filteredData.forEach(item => {
-        const key = item[groupBy];
-        
-        // Skip non-card/emi items if EMI types are selected
-        if (emiTypes.length > 0 && 
-            item.paymentMethod !== "creditCard" && 
-            item.paymentMethod !== "debitCard" &&
-            item.paymentMethod !== "emi") {
-          return;
-        }
-        
-        // Skip items with no EMI type or not matching selected EMI types
-        if (emiTypes.length > 0 && (!item.emiType || !emiTypes.includes(item.emiType) || item.emiType === "shopse")) {
-          return;
-        }
-
-        if (!summary[key]) {
-          summary[key] = {};
-        }
-
-        const emiType = item.emiType || "none";
-        
-        if (!summary[key][emiType]) {
-          summary[key][emiType] = {
-            totalTransactions: 0,
-            successCount: 0,
-            failureCount: 0,
-            refundCount: 0,
-            totalVolume: 0,
-            refundVolume: 0,
-            emiType,
-            paymentGateway: viewType === "method" ? item.paymentGateway : undefined
-          };
-        }
-        
-        summary[key][emiType].totalTransactions += 1;
-        summary[key][emiType].totalVolume += item.amount;
-        
-        if (item.status === "success") summary[key][emiType].successCount += 1;
-        if (item.status === "failure") summary[key][emiType].failureCount += 1;
-        if (item.isRefunded) {
-          summary[key][emiType].refundCount += 1;
-          summary[key][emiType].refundVolume += item.amount;
-        }
-      });
-
-      // Flatten the nested structure for rendering
-      const flattenedSummary: Record<string, PaymentSummary> = {};
-      
-      Object.entries(summary).forEach(([key, emiGroups]) => {
-        Object.entries(emiGroups as Record<string, PaymentSummary>).forEach(([emiType, data]) => {
-          const flatKey = `${key}-${emiType}`;
-          flattenedSummary[flatKey] = {
-            ...data,
-            emiType
-          };
-        });
-      });
-      
-      return flattenedSummary;
-    } else if (showFailures && viewType === "method") {
-      // For failure status with method view, include payment gateway information
-      const failureData = filteredData.filter(item => item.status === "failure");
-      
-      failureData.forEach(item => {
-        const key = item[groupBy];
-        const gatewayKey = `${key}-${item.paymentGateway}`;
-        
-        // Create entry for method-gateway combination
-        if (!summary[gatewayKey]) {
-          summary[gatewayKey] = {
-            totalTransactions: 0,
-            successCount: 0,
-            failureCount: 0,
-            refundCount: 0,
-            totalVolume: 0,
-            refundVolume: 0,
-            paymentGateway: item.paymentGateway
-          };
-        }
-        
-        const summaryItem = summary[gatewayKey] as PaymentSummary;
-        summaryItem.totalTransactions += 1;
-        summaryItem.totalVolume += item.amount;
-        summaryItem.failureCount += 1;
-      });
-      
-      return summary as Record<string, PaymentSummary>;
-    } else {
-      // Original grouping logic
-      filteredData.forEach(item => {
-        const key = item[groupBy];
-        
-        if (!summary[key]) {
-          summary[key] = {
-            totalTransactions: 0,
-            successCount: 0,
-            failureCount: 0,
-            refundCount: 0,
-            totalVolume: 0,
-            refundVolume: 0,
-            paymentGateway: viewType === "method" ? item.paymentGateway : undefined
-          };
-        }
-        
-        const summaryItem = summary[key] as PaymentSummary;
-        summaryItem.totalTransactions += 1;
-        summaryItem.totalVolume += item.amount;
-        
-        if (item.status === "success") summaryItem.successCount += 1;
-        if (item.status === "failure") summaryItem.failureCount += 1;
-        if (item.isRefunded) {
-          summaryItem.refundCount += 1;
-          summaryItem.refundVolume += item.amount;
-        }
-      });
-      
-      return summary as Record<string, PaymentSummary>;
-    }
+    return summary;
   };
   
   // Get summary data based on current view type
@@ -382,26 +219,20 @@ const Index = () => {
 
   // Helper function to handle EMI type selection
   const handleEmiTypeToggle = (emiType: string) => {
-    // If Shopse is selected, we'll need to clear other EMI types and set payment method to "emi"
     if (emiType === "shopse" && !emiTypes.includes("shopse")) {
-      // Clear other EMI types and set only shopse
       setEmiTypes(["shopse"]);
-      // Set payment method to only "emi"
       setPaymentMethods(["emi"]);
       return;
     }
     
-    // If another EMI type is selected while shopse is active, clear shopse
     if (emiType !== "shopse" && emiTypes.includes("shopse")) {
       const newEmiTypes = [emiType];
       setEmiTypes(newEmiTypes);
       
-      // Check if we have credit or debit card in payment methods
       const hasCardOrEmiMethod = paymentMethods.includes("creditCard") || 
                              paymentMethods.includes("debitCard") ||
                              paymentMethods.includes("emi");
       
-      // If no card payment method is selected, auto-select credit card
       if (!hasCardOrEmiMethod) {
         setPaymentMethods(prev => [...prev, "creditCard"]);
       }
@@ -409,40 +240,32 @@ const Index = () => {
       return;
     }
     
-    // Normal case: not handling shopse
     if (emiType !== "shopse") {
-      // Check if we have credit or debit card in payment methods
       const hasCardOrEmiMethod = paymentMethods.includes("creditCard") || 
                              paymentMethods.includes("debitCard") ||
                              paymentMethods.includes("emi");
       
-      // If EMI is being selected and no card payment method is selected, auto-select credit card
       if (!hasCardOrEmiMethod && !emiTypes.includes(emiType)) {
         setPaymentMethods(prev => [...prev, "creditCard"]);
       }
     }
     
-    // Toggle the EMI type
     handleCheckboxToggle(emiType, emiTypes, setEmiTypes);
   };
 
   // Helper function to handle payment method toggle with shopse compatibility
   const handlePaymentMethodToggle = (method: string) => {
-    // If shopse is selected, only allow "emi" as payment method
     if (emiTypes.includes("shopse")) {
       if (method === "emi") {
-        // Always keep "emi" selected when shopse is active
         if (paymentMethods.includes("emi")) {
-          return; // Don't allow deselecting "emi" when shopse is active
+          return;
         } else {
           setPaymentMethods(["emi"]);
         }
       } else {
-        // Don't allow other payment methods when shopse is selected
         return;
       }
     } else {
-      // Normal toggle behavior for other cases
       handleCheckboxToggle(method, paymentMethods, setPaymentMethods);
     }
   };
@@ -560,7 +383,7 @@ const Index = () => {
               </Select>
             </div>
 
-            {/* All Filters Button - Now opens a Dialog */}
+            {/* All Filters Button */}
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">
@@ -789,8 +612,16 @@ const Index = () => {
         </div>
       </Card>
       
-      {/* Metrics Section */}
+      {/* Metrics Section - Updated order and replaced refund volume with policy count */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-muted-foreground">Number of Policies</h3>
+            <p className="text-2xl font-bold">{policyCount}</p>
+            <p className="text-sm text-muted-foreground">Total policies processed</p>
+          </div>
+        </Card>
+        
         <Card className="p-4">
           <div className="space-y-2">
             <h3 className="text-sm font-medium text-muted-foreground">Volume Processed</h3>
@@ -801,9 +632,9 @@ const Index = () => {
         
         <Card className="p-4">
           <div className="space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Percentage</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">Success Percentage</h3>
             <p className="text-2xl font-bold text-green-600">{successPercentage.toFixed(1)}%</p>
-            <p className="text-sm text-muted-foreground">+5% vs last period</p>
+            <p className="text-sm text-muted-foreground">{successCount} successful transactions</p>
           </div>
         </Card>
         
@@ -811,20 +642,12 @@ const Index = () => {
           <div className="space-y-2">
             <h3 className="text-sm font-medium text-muted-foreground">Failure Percentage</h3>
             <p className="text-2xl font-bold text-red-600">{failurePercentage.toFixed(1)}%</p>
-            <p className="text-sm text-muted-foreground">+3% vs last period</p>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Refund Volume</h3>
-            <p className="text-2xl font-bold">{formatCurrency(refundVolume)}</p>
-            <p className="text-sm text-muted-foreground">{refundPercentage.toFixed(1)}% of success</p>
+            <p className="text-sm text-muted-foreground">{failureCount} failed transactions</p>
           </div>
         </Card>
       </div>
       
-      {/* Chart Section */}
+      {/* Chart Section - Removed options for volume/percentage toggle */}
       <Card className="p-4">
         <div className="mb-4">
           <div className="flex flex-col space-y-4">
@@ -837,12 +660,7 @@ const Index = () => {
               </Tabs>
             </div>
             
-            {/* Dynamic chart metric selector based on selected payment status */}
-            <div className="flex items-start justify-start pl-1">
-              <Tabs defaultValue={chartMetric} onValueChange={setChartMetric} className="w-[400px]">
-                {getChartMetricOptions()}
-              </Tabs>
-            </div>
+            {/* Removed the chart metric selector tabs */}
           </div>
         </div>
         
@@ -850,23 +668,14 @@ const Index = () => {
           <PaymentBarChart 
             data={filteredData} 
             viewType={viewType} 
-            chartMetric={chartMetric}
+            chartMetric="percentVolume" // New chart metric for percentage of volume
             emiTypes={emiTypes}
             paymentStatuses={paymentStatuses} 
           />
         </div>
-        
-        <div className="mt-4 flex justify-end">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowAlertModal(true)}
-          >
-            Configure Alerts
-          </Button>
-        </div>
       </Card>
       
-      {/* Summary Table - Updated with EMI Type column when needed and Payment Gateway for failures */}
+      {/* Summary Table */}
       <Card className="p-4">
         <h2 className="text-xl font-bold mb-4">
           {viewType === "gateway" ? "Payment Gateway Summary" : "Payment Method Summary"}
@@ -888,7 +697,6 @@ const Index = () => {
                     <TableHead>Failure%</TableHead>
                   </>
                 )}
-                <TableHead>Total Amount Refunded</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -929,7 +737,6 @@ const Index = () => {
                         </TableCell>
                       </>
                     )}
-                    <TableCell>{formatCurrency(data.refundVolume)}</TableCell>
                   </TableRow>
                 );
               })}
@@ -937,12 +744,6 @@ const Index = () => {
           </Table>
         </div>
       </Card>
-      
-      {/* Alert Modal */}
-      <AlertModal 
-        isOpen={showAlertModal} 
-        onClose={() => setShowAlertModal(false)} 
-      />
     </div>
   );
 };
