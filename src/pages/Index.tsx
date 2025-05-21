@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Download, ChevronDown, Plus, X, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -13,11 +12,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import PaymentBarChart from "@/components/PaymentBarChart";
 import { format } from "date-fns";
 import { mockData } from "@/data/mockData";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import ChartDisplay from "@/components/ChartDisplay";
 
 // Define type for the summary data
 interface PaymentSummary {
@@ -664,33 +663,31 @@ const Index = () => {
         </Card>
       </div>
       
-      {/* Chart Section - Removed options for volume/percentage toggle */}
-      <Card className="p-4">
-        <div className="mb-4">
-          <div className="flex flex-col space-y-4">
-            <div className="flex items-center justify-between">
-              <Tabs defaultValue="gateway" onValueChange={setViewType} className="w-[400px]">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="gateway">Payment Gateway</TabsTrigger>
-                  <TabsTrigger value="method">Payment Method</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-            
-            {/* Removed the chart metric selector tabs */}
-          </div>
-        </div>
+      {/* Chart Section - Updated to use the new ChartDisplay component */}
+      <Tabs defaultValue="gateway" onValueChange={setViewType}>
+        <TabsList className="w-[400px] mb-4">
+          <TabsTrigger value="gateway">Payment Gateway</TabsTrigger>
+          <TabsTrigger value="method">Payment Method</TabsTrigger>
+        </TabsList>
         
-        <div className="h-[400px]">
-          <PaymentBarChart 
+        <TabsContent value="gateway">
+          <ChartDisplay 
             data={filteredData} 
-            viewType={viewType} 
-            chartMetric="percentVolume" // New chart metric for percentage of volume
+            viewType="gateway" 
+            paymentStatuses={paymentStatuses}
             emiTypes={emiTypes}
-            paymentStatuses={paymentStatuses} 
           />
-        </div>
-      </Card>
+        </TabsContent>
+        
+        <TabsContent value="method">
+          <ChartDisplay 
+            data={filteredData} 
+            viewType="method" 
+            paymentStatuses={paymentStatuses}
+            emiTypes={emiTypes}
+          />
+        </TabsContent>
+      </Tabs>
       
       {/* Summary Table */}
       <Card className="p-4">
