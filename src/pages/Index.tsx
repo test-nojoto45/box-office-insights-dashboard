@@ -27,8 +27,8 @@ interface PaymentSummary {
   refundCount: number;
   totalVolume: number;
   refundVolume: number;
-  emiType?: string; // Add emiType field to the summary
-  paymentGateway?: string; // Add paymentGateway field for failure breakdown
+  emiType?: string;
+  paymentGateway?: string;
 }
 
 const Index = () => {
@@ -38,23 +38,20 @@ const Index = () => {
     to: new Date()
   });
   
-  // Replace selectedLob with businessTypes (multi-select)
-  const [businessTypes, setBusinessTypes] = useState<string[]>([]);
+  // Convert multi-select to single-select for these filters
+  const [businessType, setBusinessType] = useState<string>(""); // Changed to string (single-select)
+  const [lob, setLob] = useState<string>(""); // Changed to string (single-select)
+  const [insurer, setInsurer] = useState<string>(""); // Changed to string (single-select)
   
-  // Add LOB filter state
-  const [lobs, setLobs] = useState<string[]>([]);
-  
-  // Convert other filters to multi-select
+  // Keep these as multi-select
   const [paymentGateways, setPaymentGateways] = useState<string[]>([]);
-  const [insurers, setInsurers] = useState<string[]>([]); // Changed from banks to insurers
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [emiTypes, setEmiTypes] = useState<string[]>([]);
-  // Set "success" as the default selected payment status
   const [paymentStatuses, setPaymentStatuses] = useState<string[]>(["success"]);
   
   // State for view toggle
-  const [viewType, setViewType] = useState("gateway"); // "gateway" or "method"
-  const [chartMetric, setChartMetric] = useState("volume"); // "volume" or "success"
+  const [viewType, setViewType] = useState("gateway");
+  const [chartMetric, setChartMetric] = useState("volume");
 
   // State for alerts modal
   const [showAlertModal, setShowAlertModal] = useState(false);
@@ -74,26 +71,26 @@ const Index = () => {
   // Filtered data based on current filters
   const [filteredData, setFilteredData] = useState(mockData);
 
-  // Helper function to check if an array includes a value or is empty
-  const includesOrEmpty = (arr: string[], value: string) => {
-    return arr.length === 0 || arr.includes(value);
+  // Helper function to check if a value matches or is empty
+  const matchesOrEmpty = (selectedValue: string, itemValue: string) => {
+    return selectedValue === "" || selectedValue === itemValue;
   };
 
   // Apply filters and update filtered data
   useEffect(() => {
     let filtered = [...mockData];
     
-    // Apply each filter with multi-select logic
+    // Apply each filter
     filtered = filtered.filter(item => {
       // First, handle shopse as a special EMI type
       const shopseSelected = emiTypes.includes("shopse");
       
       // If shopse is selected, only apply LOB filter to shopse transactions
       if (shopseSelected && item.emiType === "shopse") {
-        return includesOrEmpty(lobs, item.lob) && 
-               includesOrEmpty(businessTypes, item.businessType) &&
+        return matchesOrEmpty(businessType, item.businessType) &&
+               matchesOrEmpty(lob, item.lob) &&
+               matchesOrEmpty(insurer, item.insurer) &&
                includesOrEmpty(paymentGateways, item.paymentGateway) &&
-               includesOrEmpty(insurers, item.insurer) &&
                includesOrEmpty(paymentStatuses, item.status) &&
                item.paymentMethod === "emi"; // Ensure payment method is "emi" for shopse
       }
@@ -125,11 +122,11 @@ const Index = () => {
       }
       
       return (
-        includesOrEmpty(businessTypes, item.businessType) &&
-        includesOrEmpty(lobs, item.lob) // Add LOB filter check
-        && includesOrEmpty(paymentGateways, item.paymentGateway) &&
-        includesOrEmpty(insurers, item.insurer) // Changed from banks to insurers
-        && includesOrEmpty(paymentMethods, item.paymentMethod) &&
+        matchesOrEmpty(businessType, item.businessType) &&
+        matchesOrEmpty(lob, item.lob) &&
+        matchesOrEmpty(insurer, item.insurer) &&
+        includesOrEmpty(paymentGateways, item.paymentGateway) &&
+        includesOrEmpty(paymentMethods, item.paymentMethod) &&
         isEmiCompatible &&
         includesOrEmpty(paymentStatuses, item.status)
       );
@@ -142,7 +139,12 @@ const Index = () => {
     });
     
     setFilteredData(filtered);
-  }, [businessTypes, lobs, paymentGateways, insurers, paymentMethods, emiTypes, paymentStatuses, dateRange]);
+  }, [businessType, lob, insurer, paymentGateways, paymentMethods, emiTypes, paymentStatuses, dateRange]);
+
+  // Helper function to check if an array includes a value or is empty
+  const includesOrEmpty = (arr: string[], value: string) => {
+    return arr.length === 0 || arr.includes(value);
+  };
 
   // Determine what chart metric options to show based on payment status
   const getChartMetricOptions = () => {
@@ -447,13 +449,12 @@ const Index = () => {
 
   // Reset filters function
   const resetFilters = () => {
-    setBusinessTypes([]);
-    setLobs([]);
+    setBusinessType("");
+    setLob("");
+    setInsurer("");
     setPaymentGateways([]);
-    setInsurers([]); // Changed from banks to insurers
     setPaymentMethods([]);
     setEmiTypes([]);
-    // Keep success as the default payment status
     setPaymentStatuses(["success"]);
     setDateRange({
       from: new Date(2024, 4, 1),
@@ -522,58 +523,39 @@ const Index = () => {
               </Popover>
             </div>
 
-            {/* Business Type Filter */}
+            {/* Business Type Filter - Single Select */}
             <div className="space-y-2">
               <Label>Business Type</Label>
-              <Select>
+              <Select value={businessType} onValueChange={setBusinessType}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder={businessTypes.length === 0 
-                    ? "All Types" 
-                    : `${businessTypes.length} selected`} />
+                  <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <div className="space-y-2 p-2">
-                    {["b2c", "b2b", "corporate"].map((type) => (
-                      <div key={type} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`business-${type}`}
-                          checked={businessTypes.includes(type)}
-                          onCheckedChange={() => handleCheckboxToggle(type, businessTypes, setBusinessTypes)}
-                        />
-                        <label htmlFor={`business-${type}`} className="text-sm font-medium leading-none cursor-pointer">
-                          {type.toUpperCase()}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
+                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="b2c">B2C</SelectItem>
+                  <SelectItem value="b2b">B2B</SelectItem>
+                  <SelectItem value="corporate">CORPORATE</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* LOB Filter */}
+            {/* LOB Filter - Single Select */}
             <div className="space-y-2">
               <Label>Line of Business</Label>
-              <Select>
+              <Select value={lob} onValueChange={setLob}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder={lobs.length === 0 
-                    ? "All LOBs" 
-                    : `${lobs.length} selected`} />
+                  <SelectValue placeholder="All LOBs" />
                 </SelectTrigger>
                 <SelectContent>
-                  <div className="space-y-2 p-2">
-                    {["motor", "health", "life", "SME", "pet", "travel", "fire", "marine"].map((lob) => (
-                      <div key={lob} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`lob-${lob}`}
-                          checked={lobs.includes(lob)}
-                          onCheckedChange={() => handleCheckboxToggle(lob, lobs, setLobs)}
-                        />
-                        <label htmlFor={`lob-${lob}`} className="text-sm font-medium leading-none cursor-pointer capitalize">
-                          {lob}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
+                  <SelectItem value="">All LOBs</SelectItem>
+                  <SelectItem value="motor">Motor</SelectItem>
+                  <SelectItem value="health">Health</SelectItem>
+                  <SelectItem value="life">Life</SelectItem>
+                  <SelectItem value="SME">SME</SelectItem>
+                  <SelectItem value="pet">Pet</SelectItem>
+                  <SelectItem value="travel">Travel</SelectItem>
+                  <SelectItem value="fire">Fire</SelectItem>
+                  <SelectItem value="marine">Marine</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -589,50 +571,49 @@ const Index = () => {
                 <DialogHeader>
                   <DialogTitle>Filter Options</DialogTitle>
                   <DialogDescription>
-                    Select multiple filters to refine your payment data
+                    Select filters to refine your payment data
                   </DialogDescription>
                 </DialogHeader>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-4">
-                  {/* Business Type */}
+                  {/* Business Type - Single Select */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Business Type</Label>
-                    <div className="space-y-2">
-                      {["b2c", "b2b", "corporate"].map((type) => (
-                        <div key={type} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`dialog-business-${type}`}
-                            checked={businessTypes.includes(type)}
-                            onCheckedChange={() => handleCheckboxToggle(type, businessTypes, setBusinessTypes)}
-                          />
-                          <label htmlFor={`dialog-business-${type}`} className="text-sm leading-none cursor-pointer">
-                            {type.toUpperCase()}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
+                    <Select value={businessType} onValueChange={setBusinessType}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="All Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All Types</SelectItem>
+                        <SelectItem value="b2c">B2C</SelectItem>
+                        <SelectItem value="b2b">B2B</SelectItem>
+                        <SelectItem value="corporate">CORPORATE</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   
-                  {/* LOB Filter */}
+                  {/* LOB Filter - Single Select */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Line of Business</Label>
-                    <div className="space-y-2">
-                      {["motor", "health", "life", "SME", "pet", "travel", "fire", "marine"].map((lob) => (
-                        <div key={lob} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`dialog-lob-${lob}`}
-                            checked={lobs.includes(lob)}
-                            onCheckedChange={() => handleCheckboxToggle(lob, lobs, setLobs)}
-                          />
-                          <label htmlFor={`dialog-lob-${lob}`} className="text-sm leading-none cursor-pointer capitalize">
-                            {lob}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
+                    <Select value={lob} onValueChange={setLob}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="All LOBs" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All LOBs</SelectItem>
+                        <SelectItem value="motor">Motor</SelectItem>
+                        <SelectItem value="health">Health</SelectItem>
+                        <SelectItem value="life">Life</SelectItem>
+                        <SelectItem value="SME">SME</SelectItem>
+                        <SelectItem value="pet">Pet</SelectItem>
+                        <SelectItem value="travel">Travel</SelectItem>
+                        <SelectItem value="fire">Fire</SelectItem>
+                        <SelectItem value="marine">Marine</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   
-                  {/* Payment Gateway - Updated to only show Razorpay and PayU */}
+                  {/* Payment Gateway - Still multi-select */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Gateway</Label>
                     <div className="space-y-2">
@@ -651,23 +632,24 @@ const Index = () => {
                     </div>
                   </div>
                   
-                  {/* Insurers - Replacing Banks */}
+                  {/* Insurers - Single Select */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Insurer</Label>
-                    <div className="space-y-2">
-                      {["Care", "ICICI", "Magma", "Zuno", "HDFC", "Niva Bupa", "SRGI"].map((insurer) => (
-                        <div key={insurer} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`dialog-insurer-${insurer}`}
-                            checked={insurers.includes(insurer)}
-                            onCheckedChange={() => handleCheckboxToggle(insurer, insurers, setInsurers)}
-                          />
-                          <label htmlFor={`dialog-insurer-${insurer}`} className="text-sm leading-none cursor-pointer">
-                            {insurer}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
+                    <Select value={insurer} onValueChange={setInsurer}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="All Insurers" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All Insurers</SelectItem>
+                        <SelectItem value="Care">Care</SelectItem>
+                        <SelectItem value="ICICI">ICICI</SelectItem>
+                        <SelectItem value="Magma">Magma</SelectItem>
+                        <SelectItem value="Zuno">Zuno</SelectItem>
+                        <SelectItem value="HDFC">HDFC</SelectItem>
+                        <SelectItem value="Niva Bupa">Niva Bupa</SelectItem>
+                        <SelectItem value="SRGI">SRGI</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   {/* Payment Method - Updated to handle shopse constraint */}
@@ -721,7 +703,7 @@ const Index = () => {
                     </div>
                   </div>
                   
-                  {/* Payment Status - With success as default selected */}
+                  {/* Payment Status - Still multi-select with success as default selected */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Status</Label>
                     <div className="space-y-2">
