@@ -39,9 +39,9 @@ const Index = () => {
   });
   
   // Convert multi-select to single-select for these filters
-  const [businessType, setBusinessType] = useState<string>(""); // Changed to string (single-select)
-  const [lob, setLob] = useState<string>(""); // Changed to string (single-select)
-  const [insurer, setInsurer] = useState<string>(""); // Changed to string (single-select)
+  const [businessType, setBusinessType] = useState<string | null>(null); // Changed from empty string to null
+  const [lob, setLob] = useState<string | null>(null); // Changed from empty string to null
+  const [insurer, setInsurer] = useState<string | null>(null); // Changed from empty string to null
   
   // Keep these as multi-select
   const [paymentGateways, setPaymentGateways] = useState<string[]>([]);
@@ -72,8 +72,8 @@ const Index = () => {
   const [filteredData, setFilteredData] = useState(mockData);
 
   // Helper function to check if a value matches or is empty
-  const matchesOrEmpty = (selectedValue: string, itemValue: string) => {
-    return selectedValue === "" || selectedValue === itemValue;
+  const matchesOrEmpty = (selectedValue: string | null, itemValue: string) => {
+    return selectedValue === null || selectedValue === itemValue;
   };
 
   // Apply filters and update filtered data
@@ -449,9 +449,9 @@ const Index = () => {
 
   // Reset filters function
   const resetFilters = () => {
-    setBusinessType("");
-    setLob("");
-    setInsurer("");
+    setBusinessType(null);
+    setLob(null);
+    setInsurer(null);
     setPaymentGateways([]);
     setPaymentMethods([]);
     setEmiTypes([]);
@@ -526,12 +526,12 @@ const Index = () => {
             {/* Business Type Filter - Single Select */}
             <div className="space-y-2">
               <Label>Business Type</Label>
-              <Select value={businessType} onValueChange={setBusinessType}>
+              <Select value={businessType || undefined} onValueChange={setBusinessType}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="b2c">B2C</SelectItem>
                   <SelectItem value="b2b">B2B</SelectItem>
                   <SelectItem value="corporate">CORPORATE</SelectItem>
@@ -542,12 +542,12 @@ const Index = () => {
             {/* LOB Filter - Single Select */}
             <div className="space-y-2">
               <Label>Line of Business</Label>
-              <Select value={lob} onValueChange={setLob}>
+              <Select value={lob || undefined} onValueChange={setLob}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="All LOBs" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All LOBs</SelectItem>
+                  <SelectItem value="all">All LOBs</SelectItem>
                   <SelectItem value="motor">Motor</SelectItem>
                   <SelectItem value="health">Health</SelectItem>
                   <SelectItem value="life">Life</SelectItem>
@@ -579,12 +579,12 @@ const Index = () => {
                   {/* Business Type - Single Select */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Business Type</Label>
-                    <Select value={businessType} onValueChange={setBusinessType}>
+                    <Select value={businessType || undefined} onValueChange={setBusinessType}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="All Types" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Types</SelectItem>
+                        <SelectItem value="all">All Types</SelectItem>
                         <SelectItem value="b2c">B2C</SelectItem>
                         <SelectItem value="b2b">B2B</SelectItem>
                         <SelectItem value="corporate">CORPORATE</SelectItem>
@@ -595,12 +595,12 @@ const Index = () => {
                   {/* LOB Filter - Single Select */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Line of Business</Label>
-                    <Select value={lob} onValueChange={setLob}>
+                    <Select value={lob || undefined} onValueChange={setLob}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="All LOBs" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All LOBs</SelectItem>
+                        <SelectItem value="all">All LOBs</SelectItem>
                         <SelectItem value="motor">Motor</SelectItem>
                         <SelectItem value="health">Health</SelectItem>
                         <SelectItem value="life">Life</SelectItem>
@@ -635,12 +635,12 @@ const Index = () => {
                   {/* Insurers - Single Select */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Insurer</Label>
-                    <Select value={insurer} onValueChange={setInsurer}>
+                    <Select value={insurer || undefined} onValueChange={setInsurer}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="All Insurers" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Insurers</SelectItem>
+                        <SelectItem value="all">All Insurers</SelectItem>
                         <SelectItem value="Care">Care</SelectItem>
                         <SelectItem value="ICICI">ICICI</SelectItem>
                         <SelectItem value="Magma">Magma</SelectItem>
