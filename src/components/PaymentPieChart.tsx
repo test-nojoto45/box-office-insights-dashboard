@@ -14,6 +14,21 @@ interface CustomTooltipProps {
   label?: any;
 }
 
+// Define a proper interface for our chart data
+interface ChartDataItem {
+  name: string;
+  value: number;
+  count: number;
+  amount: number;
+  percentage: number;
+  breakdown: {
+    [key: string]: {
+      count: number;
+      amount: number;
+    }
+  }
+}
+
 const COLORS = [
   "#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", 
   "#82CA9D", "#F66D44", "#6495ED", "#40E0D0", "#9370DB"
@@ -38,7 +53,7 @@ const PaymentPieChart: React.FC<PaymentPieChartProps> = ({ data, viewType }) => 
     const failureData = data.filter(item => item.status === "failure" && item.failureReason);
     
     // Group by failure reason
-    const groupedByReason = failureData.reduce((acc: any, item: any) => {
+    const groupedByReason = failureData.reduce((acc: Record<string, any>, item: any) => {
       const reason = item.failureReason || "Unknown";
       
       if (!acc[reason]) {
@@ -110,10 +125,10 @@ const PaymentPieChart: React.FC<PaymentPieChartProps> = ({ data, viewType }) => 
     
     // Calculate percentages
     const total = top5.reduce((sum: number, item: any) => sum + item.count, 0);
-    return top5.map(item => ({
+    return top5.map((item: any) => ({
       ...item,
       percentage: (item.count / total) * 100
-    }));
+    })) as ChartDataItem[];
   }, [data, viewType]);
 
   // Format for the tooltip
@@ -130,7 +145,7 @@ const PaymentPieChart: React.FC<PaymentPieChartProps> = ({ data, viewType }) => 
   // Custom tooltip
   const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload }) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
+      const data = payload[0].payload as ChartDataItem;
       return (
         <div className="bg-background border border-border p-3 rounded shadow-lg">
           <p className="font-medium">{data.name}</p>
@@ -140,7 +155,7 @@ const PaymentPieChart: React.FC<PaymentPieChartProps> = ({ data, viewType }) => 
           {Object.keys(data.breakdown).length > 0 && (
             <div className="mt-2 border-t pt-1 text-xs">
               <p className="font-medium">Breakdown:</p>
-              {Object.entries(data.breakdown).map(([key, value]: [string, any]) => (
+              {Object.entries(data.breakdown).map(([key, value]) => (
                 <p key={key} className="ml-2">
                   {viewType === "method" ? formatMethodName(key) : key}: {value.count} ({formatAmount(value.amount)})
                 </p>
