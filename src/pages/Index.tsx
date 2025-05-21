@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Download, ChevronDown, Plus, X, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -26,7 +27,7 @@ interface PaymentSummary {
   refundCount: number;
   totalVolume: number;
   refundVolume: number;
-  policyCount: number; // Added new field for policy count
+  policyCount: number;
   emiType?: string;
   paymentGateway?: string;
 }
@@ -51,8 +52,6 @@ const Index = () => {
   
   // State for view toggle
   const [viewType, setViewType] = useState("gateway");
-
-  // Removed chartMetric state since we're no longer offering those options
   
   // State for export fields
   const [selectedExportFields, setSelectedExportFields] = useState({
@@ -119,6 +118,11 @@ const Index = () => {
         return false;
       }
       
+      // Handle refund filter
+      if (paymentStatuses.includes("refund") && !paymentStatuses.includes(item.status)) {
+        return item.isRefunded; // Show refunded transactions regardless of their status
+      }
+      
       return (
         matchesOrEmpty(businessType, item.businessType) &&
         matchesOrEmpty(lob, item.lob) &&
@@ -126,7 +130,9 @@ const Index = () => {
         includesOrEmpty(paymentGateways, item.paymentGateway) &&
         includesOrEmpty(paymentMethods, item.paymentMethod) &&
         isEmiCompatible &&
-        includesOrEmpty(paymentStatuses, item.status)
+        (paymentStatuses.includes("refund") ? 
+          (item.isRefunded || includesOrEmpty(paymentStatuses, item.status)) :
+          includesOrEmpty(paymentStatuses, item.status))
       );
     });
 
@@ -153,6 +159,11 @@ const Index = () => {
   
   // Calculate policy count - assume each transaction represents a policy
   const policyCount = filteredData.length;
+  
+  // Calculate refund metrics
+  const refundCount = filteredData.filter(item => item.isRefunded).length;
+  const refundVolume = filteredData.filter(item => item.isRefunded).reduce((sum, item) => sum + item.amount, 0);
+  const refundPercentage = filteredData.length > 0 ? (refundCount / filteredData.length) * 100 : 0;
 
   // Format EMI type name for display
   const formatEmiTypeName = (emiType: string) => {
@@ -308,6 +319,12 @@ const Index = () => {
       : [...currentItems, value];
     setItems(updatedItems);
   };
+
+  // Check if we should show failure details based on status filter
+  const showFailureDetails = paymentStatuses.length === 1 && paymentStatuses.includes("failure");
+  
+  // Check if we should show refund details based on status filter
+  const showRefundDetails = paymentStatuses.length === 1 && paymentStatuses.includes("refund");
 
   return (
     <div className="container max-w-7xl mx-auto py-6 space-y-6">
@@ -530,7 +547,7 @@ const Index = () => {
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Status</Label>
                     <div className="space-y-2">
-                      {["success", "failure", "pending"].map((status) => (
+                      {["success", "failure", "pending", "refund"].map((status) => (
                         <div key={status} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`dialog-status-${status}`}
@@ -686,17 +703,19 @@ const Index = () => {
               <TableRow>
                 <TableHead>{viewType === "gateway" ? "Payment Gateway" : "Payment Method"}</TableHead>
                 {emiTypes.length > 0 && <TableHead>EMI Type</TableHead>}
-                {viewType === "method" && paymentStatuses.length === 1 && paymentStatuses.includes("failure") && (
+                {viewType === "method" && showFailureDetails && (
                   <TableHead>Payment Gateway</TableHead>
                 )}
                 <TableHead>Total Transactions</TableHead>
                 <TableHead>Total Volume</TableHead>
-                {!(paymentStatuses.length === 1 && paymentStatuses.includes("failure")) && (
+                {showRefundDetails ? (
+                  <TableHead>Refund Count</TableHead>
+                ) : (!showFailureDetails && (
                   <>
                     <TableHead>Success%</TableHead>
                     <TableHead>Failure%</TableHead>
                   </>
-                )}
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -716,14 +735,16 @@ const Index = () => {
                         {data.emiType && data.emiType !== "none" ? formatEmiTypeName(data.emiType) : "N/A"}
                       </TableCell>
                     )}
-                    {viewType === "method" && paymentStatuses.length === 1 && paymentStatuses.includes("failure") && (
+                    {viewType === "method" && showFailureDetails && (
                       <TableCell>
                         {data.paymentGateway || (key.includes('-') ? key.split('-')[1] : "N/A")}
                       </TableCell>
                     )}
                     <TableCell>{data.totalTransactions}</TableCell>
                     <TableCell>{formatCurrency(data.totalVolume)}</TableCell>
-                    {!(paymentStatuses.length === 1 && paymentStatuses.includes("failure")) && (
+                    {showRefundDetails ? (
+                      <TableCell>{data.refundCount}</TableCell>
+                    ) : (!showFailureDetails && (
                       <>
                         <TableCell>
                           {data.totalTransactions > 0 
@@ -736,7 +757,7 @@ const Index = () => {
                             : 0}%
                         </TableCell>
                       </>
-                    )}
+                    ))}
                   </TableRow>
                 );
               })}
