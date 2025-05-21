@@ -125,10 +125,9 @@ const PaymentPieChart: React.FC<PaymentPieChartProps> = ({ data, viewType }) => 
     
     // Calculate percentages
     const total = top5.reduce((sum: number, item: any) => sum + item.count, 0);
-    // Fix: Ensure that both sides of the arithmetic operation are numbers
     return top5.map((item: any) => ({
       ...item,
-      percentage: total > 0 ? (item.count / Number(total)) * 100 : 0
+      percentage: (item.count / total) * 100
     })) as ChartDataItem[];
   }, [data, viewType]);
 
