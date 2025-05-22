@@ -11,7 +11,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
-import PaymentBarChart from "@/components/PaymentBarChart";
 import PaymentLineChart from "@/components/PaymentLineChart";
 import PaymentPieChart from "@/components/PaymentPieChart";
 
@@ -30,7 +29,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
   emiTypes,
   onRefresh 
 }) => {
-  // State for y-axis metric (removed chart type state)
+  // State for y-axis metric
   const [yAxisMetric, setYAxisMetric] = React.useState<"percentVolume" | "orderCount">("percentVolume");
   
   // Check if we should show pie chart (when only failure status is selected)
@@ -44,7 +43,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
             variant="outline" 
             size="sm" 
             onClick={onRefresh} 
-            className="flex items-center gap-2 text-primary border-primary"
+            className="flex items-center gap-2 text-figma-blue-DEFAULT border-figma-blue-DEFAULT hover:bg-figma-blue-light/10"
           >
             <RefreshCw className="h-4 w-4" />
             Refresh
@@ -83,7 +82,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
                 variant="outline" 
                 size="sm" 
                 onClick={onRefresh} 
-                className="flex items-center gap-2 text-primary border-primary hover:bg-primary/5"
+                className="flex items-center gap-2 text-figma-blue-DEFAULT border-figma-blue-DEFAULT hover:bg-figma-blue-light/10"
               >
                 <RefreshCw className="h-4 w-4" />
                 Refresh

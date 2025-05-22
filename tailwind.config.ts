@@ -63,7 +63,7 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Add the new colors from Figma
+				// Updated colors to match Figma document exactly
 				success: {
 					DEFAULT: 'hsl(var(--success))',
 					foreground: 'hsl(var(--success-foreground))'
@@ -72,23 +72,26 @@ export default {
 					DEFAULT: 'hsl(var(--warning))',
 					foreground: 'hsl(var(--warning-foreground))'
 				},
-				// Specific colors from the Figma design
+				// Specific colors from the Figma design - updated to exact hex codes from Figma
 				'figma-blue': {
-					light: '#60A5FA',  // Light blue from charts
-					DEFAULT: '#3B82F6', // Primary blue
-					dark: '#2563EB',   // Dark blue for hover
+					light: '#60A5FA',  // Light blue for chart bars
+					DEFAULT: '#3B82F6', // Primary blue for tabs/buttons
+					dark: '#2563EB',   // Dark blue for hover states
 				},
 				'figma-green': {
-					DEFAULT: '#22C55E', // Success green
+					DEFAULT: '#22C55E', // Success card color
 				},
 				'figma-red': {
-					DEFAULT: '#EF4444', // Failure red 
+					DEFAULT: '#EF4444', // Failure card color
 				},
 				'figma-amber': {
-					DEFAULT: '#F59E0B', // Refund/warning amber
+					DEFAULT: '#F59E0B', // Refund card color
 				},
 				'figma-teal': {
-					DEFAULT: '#2DD4BF', // Teal color from charts
+					DEFAULT: '#2DD4BF', // Teal color in charts
+				},
+				'figma-purple': {
+					DEFAULT: '#A78BFA', // Purple color in charts
 				}
 			},
 			borderRadius: {
