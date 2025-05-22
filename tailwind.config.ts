@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,33 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Add the new colors from Figma
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))'
+				},
+				warning: {
+					DEFAULT: 'hsl(var(--warning))',
+					foreground: 'hsl(var(--warning-foreground))'
+				},
+				// Specific colors from the Figma design
+				'figma-blue': {
+					light: '#60A5FA',  // Light blue from charts
+					DEFAULT: '#3B82F6', // Primary blue
+					dark: '#2563EB',   // Dark blue for hover
+				},
+				'figma-green': {
+					DEFAULT: '#22C55E', // Success green
+				},
+				'figma-red': {
+					DEFAULT: '#EF4444', // Failure red 
+				},
+				'figma-amber': {
+					DEFAULT: '#F59E0B', // Refund/warning amber
+				},
+				'figma-teal': {
+					DEFAULT: '#2DD4BF', // Teal color from charts
 				}
 			},
 			borderRadius: {

@@ -44,7 +44,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
             variant="outline" 
             size="sm" 
             onClick={onRefresh} 
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 text-primary border-primary"
           >
             <RefreshCw className="h-4 w-4" />
             Refresh
@@ -56,22 +56,20 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
   }
   
   return (
-    <Card className="p-4">
-      <div className="mb-4">
+    <Card className="p-6 shadow-sm border-slate-200">
+      <div className="mb-6">
         <div className="flex flex-col space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">Payment Analytics</h2>
+            <h2 className="text-xl font-semibold text-slate-800">Payment Analytics</h2>
             
             <div className="flex items-center space-x-4">
-              {/* Removed chart type dropdown */}
-              
               <div className="flex items-center space-x-2">
-                <Label htmlFor="y-axis-metric">Y-Axis Metric:</Label>
+                <Label htmlFor="y-axis-metric" className="text-sm text-slate-600">Y-Axis Metric:</Label>
                 <Select
                   value={yAxisMetric}
                   onValueChange={(value: "percentVolume" | "orderCount") => setYAxisMetric(value)}
                 >
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[180px] border-slate-300 bg-white">
                     <SelectValue placeholder="Select metric" />
                   </SelectTrigger>
                   <SelectContent>
@@ -85,7 +83,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
                 variant="outline" 
                 size="sm" 
                 onClick={onRefresh} 
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 text-primary border-primary hover:bg-primary/5"
               >
                 <RefreshCw className="h-4 w-4" />
                 Refresh
