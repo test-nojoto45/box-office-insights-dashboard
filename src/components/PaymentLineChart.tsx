@@ -16,11 +16,13 @@ import { Card } from "@/components/ui/card";
 interface PaymentLineChartProps {
   data: any[];
   yAxisMetric: "percentVolume" | "orderCount";
+  paymentStatuses?: string[]; // Add paymentStatuses prop
 }
 
 const PaymentLineChart: React.FC<PaymentLineChartProps> = ({ 
   data,
-  yAxisMetric
+  yAxisMetric,
+  paymentStatuses = ["success", "failure"] // Default to showing all statuses
 }) => {
   // Prepare the data for the line chart
   const chartData = useMemo(() => {
@@ -64,8 +66,8 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
     
     // Convert to array and sort by date
     return Object.values(dateGroups)
-      .map(group => {
-        const processedGroup = { ...group } as any;
+      .map((group: any) => {
+        const processedGroup = { ...group };
         
         // Calculate percentages
         if (processedGroup.totalAmount > 0) {
@@ -94,16 +96,86 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
     );
   }
 
+  // Define color mapping for statuses
+  const statusColors = {
+    success: "#10B981", // green
+    failure: "#EF4444", // red
+    refund: "#F59E0B",  // amber
+    total: "#6366F1"    // indigo
+  };
+
+  // Determine which lines to show based on selected metrics and statuses
+  const getLinesToShow = () => {
+    switch (yAxisMetric) {
+      case "percentVolume":
+        return [
+          { 
+            id: "success", 
+            dataKey: "successVolumePercent", 
+            stroke: statusColors.success, 
+            name: "Success Volume %",
+            visible: paymentStatuses.includes("success")
+          },
+          { 
+            id: "failure", 
+            dataKey: "failureVolumePercent", 
+            stroke: statusColors.failure, 
+            name: "Failure Volume %",
+            visible: paymentStatuses.includes("failure")
+          },
+          { 
+            id: "refund", 
+            dataKey: "refundVolumePercent", 
+            stroke: statusColors.refund, 
+            name: "Refund Volume %",
+            visible: paymentStatuses.includes("refund")
+          }
+        ].filter(line => line.visible);
+        
+      case "orderCount":
+        return [
+          { 
+            id: "total", 
+            dataKey: "totalCount", 
+            stroke: statusColors.total, 
+            name: "Total Orders",
+            visible: paymentStatuses.length > 1
+          },
+          { 
+            id: "success", 
+            dataKey: "successCount", 
+            stroke: statusColors.success, 
+            name: "Successful Orders",
+            visible: paymentStatuses.includes("success")
+          },
+          { 
+            id: "failure", 
+            dataKey: "failureCount", 
+            stroke: statusColors.failure, 
+            name: "Failed Orders",
+            visible: paymentStatuses.includes("failure")
+          },
+          { 
+            id: "refund", 
+            dataKey: "refundCount", 
+            stroke: statusColors.refund, 
+            name: "Refunded Orders",
+            visible: paymentStatuses.includes("refund")
+          }
+        ].filter(line => line.visible);
+        
+      default:
+        return [];
+    }
+  };
+
+  const linesToShow = getLinesToShow();
+
   // Determine y-axis configuration based on selected metric
   const getYAxisConfig = () => {
     switch (yAxisMetric) {
       case "percentVolume":
         return {
-          lines: [
-            { dataKey: "successVolumePercent", stroke: "#10B981", name: "Success Volume %" },
-            { dataKey: "failureVolumePercent", stroke: "#EF4444", name: "Failure Volume %" },
-            { dataKey: "refundVolumePercent", stroke: "#F59E0B", name: "Refund Volume %" }
-          ],
           yAxisDomain: [0, 100],
           yAxisLabel: "Percentage of Volume",
           tooltipFormatter: (value: number) => `${value.toFixed(1)}%`
@@ -111,12 +183,6 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
         
       case "orderCount":
         return {
-          lines: [
-            { dataKey: "totalCount", stroke: "#6366F1", name: "Total Orders" },
-            { dataKey: "successCount", stroke: "#10B981", name: "Successful Orders" },
-            { dataKey: "failureCount", stroke: "#EF4444", name: "Failed Orders" },
-            { dataKey: "refundCount", stroke: "#F59E0B", name: "Refunded Orders" }
-          ],
           yAxisDomain: ['auto', 'auto'],
           yAxisLabel: "Number of Orders",
           tooltipFormatter: (value: number) => value.toString()
@@ -124,9 +190,6 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
         
       default:
         return {
-          lines: [
-            { dataKey: "successVolumePercent", stroke: "#10B981", name: "Success Volume %" }
-          ],
           yAxisDomain: [0, 100],
           yAxisLabel: "Percentage",
           tooltipFormatter: (value: number) => `${value.toFixed(1)}%`
@@ -177,9 +240,9 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
             />
             <Legend />
             
-            {yAxisConfig.lines.map((line, index) => (
+            {linesToShow.map((line, index) => (
               <Line
-                key={index}
+                key={line.id}
                 type="monotone"
                 dataKey={line.dataKey}
                 stroke={line.stroke}

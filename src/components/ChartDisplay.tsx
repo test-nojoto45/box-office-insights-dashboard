@@ -93,7 +93,8 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
         ) : (
           <PaymentLineChart 
             data={data} 
-            yAxisMetric={yAxisMetric} 
+            yAxisMetric={yAxisMetric}
+            paymentStatuses={paymentStatuses}  // Pass the selected payment statuses
           />
         )}
       </div>
