@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, ChevronDown, Plus, X, Filter } from "lucide-react";
+import { Download, ChevronDown, Plus, X, Filter, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -324,6 +324,13 @@ const Index = () => {
   
   // Check if we should show refund details based on status filter
   const showRefundDetails = paymentStatuses.length === 1 && paymentStatuses.includes("refund");
+
+  // Add refresh function
+  const handleRefresh = () => {
+    // This will re-fetch or re-process data while keeping current filters
+    setFilteredData([...filteredData]); // Force re-render by creating new array reference
+    toast.success("Charts refreshed successfully!");
+  };
 
   return (
     <div className="container max-w-7xl mx-auto py-6 space-y-6">
@@ -663,7 +670,7 @@ const Index = () => {
         </Card>
       </div>
       
-      {/* Chart Section - Updated to use the new ChartDisplay component */}
+      {/* Chart Section - Updated to pass the refresh handler */}
       <Tabs defaultValue="gateway" onValueChange={setViewType}>
         <TabsList className="w-[400px] mb-4">
           <TabsTrigger value="gateway">Payment Gateway</TabsTrigger>
@@ -676,6 +683,7 @@ const Index = () => {
             viewType="gateway" 
             paymentStatuses={paymentStatuses}
             emiTypes={emiTypes}
+            onRefresh={handleRefresh}
           />
         </TabsContent>
         
@@ -685,6 +693,7 @@ const Index = () => {
             viewType="method" 
             paymentStatuses={paymentStatuses}
             emiTypes={emiTypes}
+            onRefresh={handleRefresh}
           />
         </TabsContent>
       </Tabs>

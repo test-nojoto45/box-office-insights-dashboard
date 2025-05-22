@@ -9,6 +9,8 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 import PaymentBarChart from "@/components/PaymentBarChart";
 import PaymentLineChart from "@/components/PaymentLineChart";
 import PaymentPieChart from "@/components/PaymentPieChart";
@@ -18,23 +20,39 @@ interface ChartDisplayProps {
   viewType: string;
   paymentStatuses: string[];
   emiTypes: string[];
+  onRefresh?: () => void;
 }
 
 const ChartDisplay: React.FC<ChartDisplayProps> = ({ 
   data, 
   viewType, 
   paymentStatuses, 
-  emiTypes 
+  emiTypes,
+  onRefresh 
 }) => {
-  // State for chart type and y-axis metric
-  const [chartType, setChartType] = React.useState<"bar" | "line">("line");
+  // State for y-axis metric (removed chart type state)
   const [yAxisMetric, setYAxisMetric] = React.useState<"percentVolume" | "orderCount">("percentVolume");
   
   // Check if we should show pie chart (when only failure status is selected)
   const showPieChart = paymentStatuses.length === 1 && paymentStatuses.includes("failure");
   
   if (showPieChart) {
-    return <PaymentPieChart data={data} paymentStatuses={paymentStatuses} />;
+    return (
+      <div>
+        <div className="flex justify-end mb-4">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onRefresh} 
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
+        <PaymentPieChart data={data} paymentStatuses={paymentStatuses} />
+      </div>
+    );
   }
   
   return (
@@ -45,21 +63,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
             <h2 className="text-xl font-bold">Payment Analytics</h2>
             
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="chart-type">Chart Type:</Label>
-                <Select
-                  value={chartType}
-                  onValueChange={(value: "bar" | "line") => setChartType(value)}
-                >
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Select chart" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bar">Bar Chart</SelectItem>
-                    <SelectItem value="line">Line Chart</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Removed chart type dropdown */}
               
               <div className="flex items-center space-x-2">
                 <Label htmlFor="y-axis-metric">Y-Axis Metric:</Label>
@@ -76,27 +80,28 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
                   </SelectContent>
                 </Select>
               </div>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onRefresh} 
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
             </div>
           </div>
         </div>
       </div>
       
       <div className="h-[400px]">
-        {chartType === "bar" ? (
-          <PaymentBarChart 
-            data={data} 
-            viewType={viewType} 
-            chartMetric="percentVolume"
-            emiTypes={emiTypes}
-            paymentStatuses={paymentStatuses} 
-          />
-        ) : (
-          <PaymentLineChart 
-            data={data} 
-            yAxisMetric={yAxisMetric}
-            paymentStatuses={paymentStatuses}  // Pass the selected payment statuses
-          />
-        )}
+        <PaymentLineChart 
+          data={data} 
+          viewType={viewType} 
+          yAxisMetric={yAxisMetric}
+          paymentStatuses={paymentStatuses}
+        />
       </div>
     </Card>
   );
