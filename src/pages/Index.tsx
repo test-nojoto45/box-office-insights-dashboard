@@ -597,7 +597,7 @@ const Index = () => {
                     </div>
                   </div>
 
-                  {/* Card Type Filter - New */}
+                  {/* Card Type Filter - Updated to enable when EMI is selected */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Card Type</Label>
                     <div className="space-y-2">
@@ -617,6 +617,11 @@ const Index = () => {
                       {!paymentMethods.includes("cards") && !paymentMethods.includes("emi") && (
                         <p className="text-xs text-muted-foreground mt-1">
                           Select "Cards" or "EMI" in Payment Method to enable card type filtering
+                        </p>
+                      )}
+                      {paymentMethods.includes("emi") && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Card type applies to EMI transactions as well
                         </p>
                       )}
                     </div>

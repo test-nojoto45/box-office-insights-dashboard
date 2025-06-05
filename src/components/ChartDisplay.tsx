@@ -19,6 +19,7 @@ interface ChartDisplayProps {
   viewType: string;
   paymentStatuses: string[];
   emiTypes: string[];
+  paymentMethods: string[];
   onRefresh?: () => void;
 }
 
@@ -27,6 +28,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
   viewType, 
   paymentStatuses, 
   emiTypes,
+  paymentMethods,
   onRefresh 
 }) => {
   // State for y-axis metric
@@ -80,6 +82,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
               viewType={viewType} 
               yAxisMetric={yAxisMetric}
               paymentStatuses={paymentStatuses}
+              paymentMethods={paymentMethods}
             />
           </div>
         </Card>
@@ -132,6 +135,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
           viewType={viewType} 
           yAxisMetric={yAxisMetric}
           paymentStatuses={paymentStatuses}
+          paymentMethods={paymentMethods}
         />
       </div>
     </Card>

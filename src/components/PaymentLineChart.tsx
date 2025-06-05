@@ -15,16 +15,18 @@ import { Card } from "@/components/ui/card";
 
 interface PaymentLineChartProps {
   data: any[];
-  viewType: string; // Add viewType prop
+  viewType: string;
   yAxisMetric: "percentVolume" | "orderCount";
   paymentStatuses?: string[];
+  paymentMethods?: string[];
 }
 
 const PaymentLineChart: React.FC<PaymentLineChartProps> = ({ 
   data,
   viewType,
   yAxisMetric,
-  paymentStatuses = ["success", "failure"]
+  paymentStatuses = ["success", "failure"],
+  paymentMethods = []
 }) => {
   // Prepare the data for the line chart
   const chartData = useMemo(() => {
@@ -45,7 +47,8 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
           failureCount: 0,
           refundCount: 0,
           // Initialize payment method specific data
-          methodData: {} 
+          methodData: {},
+          gatewayData: {}
         };
       }
       
@@ -78,6 +81,17 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
         }
         acc[dateStr].methodData[method].amount += item.amount;
         acc[dateStr].methodData[method].count += 1;
+      } else if (viewType === "gateway") {
+        // Track data by payment gateway
+        const gateway = item.paymentGateway;
+        if (!acc[dateStr].gatewayData[gateway]) {
+          acc[dateStr].gatewayData[gateway] = {
+            amount: 0,
+            count: 0
+          };
+        }
+        acc[dateStr].gatewayData[gateway].amount += item.amount;
+        acc[dateStr].gatewayData[gateway].count += 1;
       }
       
       return acc;
@@ -104,7 +118,6 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
           const methods = Object.keys(processedGroup.methodData);
           
           methods.forEach(method => {
-            // Calculate percentages based on total
             const methodData = processedGroup.methodData[method];
             if (processedGroup.totalAmount > 0) {
               processedGroup[`${method}VolumePercent`] = (methodData.amount / processedGroup.totalAmount) * 100;
@@ -112,8 +125,21 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
               processedGroup[`${method}VolumePercent`] = 0;
             }
             
-            // Also store the count
             processedGroup[`${method}Count`] = methodData.count;
+          });
+        } else if (viewType === "gateway" && processedGroup.gatewayData) {
+          // Calculate percentages for payment gateways
+          const gateways = Object.keys(processedGroup.gatewayData);
+          
+          gateways.forEach(gateway => {
+            const gatewayData = processedGroup.gatewayData[gateway];
+            if (processedGroup.totalAmount > 0) {
+              processedGroup[`${gateway}VolumePercent`] = (gatewayData.amount / processedGroup.totalAmount) * 100;
+            } else {
+              processedGroup[`${gateway}VolumePercent`] = 0;
+            }
+            
+            processedGroup[`${gateway}Count`] = gatewayData.count;
           });
         }
         
@@ -133,21 +159,24 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
     );
   }
 
-  // Define color mapping for statuses and payment methods
-  const statusColors = {
-    success: "#10B981", // green
-    failure: "#EF4444", // red
-    refund: "#F59E0B",  // amber
-    total: "#6366F1",   // indigo
-    creditCard: "#8B5CF6", // purple
-    debitCard: "#EC4899", // pink
-    netBanking: "#0EA5E9", // blue
-    upi: "#14B8A6", // teal
-    wallet: "#F97316", // orange
-    emi: "#8B5CF6" // purple
+  // Define color mapping for statuses, payment methods, and gateways
+  const colors = {
+    success: "#10B981",
+    failure: "#EF4444",
+    refund: "#F59E0B",
+    total: "#6366F1",
+    creditCard: "#8B5CF6",
+    debitCard: "#EC4899",
+    netBanking: "#0EA5E9",
+    upi: "#14B8A6",
+    wallet: "#F97316",
+    emi: "#8B5CF6",
+    cards: "#9333EA",
+    Razorpay: "#3B82F6",
+    PayU: "#10B981"
   };
 
-  // Format payment method name for display
+  // Format names for display
   const formatMethodName = (method: string) => {
     switch (method) {
       case "creditCard": return "Credit Card";
@@ -156,6 +185,7 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
       case "upi": return "UPI";
       case "wallet": return "Wallet";
       case "emi": return "EMI";
+      case "cards": return "Cards";
       default: return method;
     }
   };
@@ -164,30 +194,68 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
   const getLinesToShow = () => {
     // If we're in payment method view
     if (viewType === "method") {
-      // Get unique payment methods from the data
-      const paymentMethods = Array.from(
+      // Get unique payment methods from the data, filtered by selected payment methods
+      let paymentMethodsToShow = Array.from(
         new Set(data.map(item => item.paymentMethod))
       );
       
+      // If specific payment methods are selected, filter to only show those
+      if (paymentMethods.length > 0) {
+        // Handle the special case of "cards" which should show both creditCard and debitCard
+        const expandedMethods = [];
+        for (const method of paymentMethods) {
+          if (method === "cards") {
+            expandedMethods.push("creditCard", "debitCard");
+          } else {
+            expandedMethods.push(method);
+          }
+        }
+        paymentMethodsToShow = paymentMethodsToShow.filter(method => expandedMethods.includes(method));
+      }
+      
       if (yAxisMetric === "percentVolume") {
-        return paymentMethods.map(method => ({
+        return paymentMethodsToShow.map(method => ({
           id: method,
           dataKey: `${method}VolumePercent`,
-          stroke: statusColors[method] || "#666",
+          stroke: colors[method] || "#666",
           name: `${formatMethodName(method)} Volume %`,
           visible: true
         }));
-      } else { // orderCount
-        return paymentMethods.map(method => ({
+      } else {
+        return paymentMethodsToShow.map(method => ({
           id: method,
           dataKey: `${method}Count`,
-          stroke: statusColors[method] || "#666",
+          stroke: colors[method] || "#666",
           name: `${formatMethodName(method)} Orders`,
           visible: true
         }));
       }
     } 
-    // Default view - status based
+    // Gateway view
+    else if (viewType === "gateway") {
+      const gateways = Array.from(
+        new Set(data.map(item => item.paymentGateway))
+      );
+      
+      if (yAxisMetric === "percentVolume") {
+        return gateways.map(gateway => ({
+          id: gateway,
+          dataKey: `${gateway}VolumePercent`,
+          stroke: colors[gateway] || "#666",
+          name: `${gateway} Volume %`,
+          visible: true
+        }));
+      } else {
+        return gateways.map(gateway => ({
+          id: gateway,
+          dataKey: `${gateway}Count`,
+          stroke: colors[gateway] || "#666",
+          name: `${gateway} Orders`,
+          visible: true
+        }));
+      }
+    }
+    // Default status-based view
     else {
       switch (yAxisMetric) {
         case "percentVolume":
@@ -195,21 +263,21 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
             { 
               id: "success", 
               dataKey: "successVolumePercent", 
-              stroke: statusColors.success, 
+              stroke: colors.success, 
               name: "Success Volume %",
               visible: paymentStatuses.includes("success")
             },
             { 
               id: "failure", 
               dataKey: "failureVolumePercent", 
-              stroke: statusColors.failure, 
+              stroke: colors.failure, 
               name: "Failure Volume %",
               visible: paymentStatuses.includes("failure")
             },
             { 
               id: "refund", 
               dataKey: "refundVolumePercent", 
-              stroke: statusColors.refund, 
+              stroke: colors.refund, 
               name: "Refund Volume %",
               visible: paymentStatuses.includes("refund")
             }
@@ -220,28 +288,28 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
             { 
               id: "total", 
               dataKey: "totalCount", 
-              stroke: statusColors.total, 
+              stroke: colors.total, 
               name: "Total Orders",
               visible: paymentStatuses.length > 1
             },
             { 
               id: "success", 
               dataKey: "successCount", 
-              stroke: statusColors.success, 
+              stroke: colors.success, 
               name: "Successful Orders",
               visible: paymentStatuses.includes("success")
             },
             { 
               id: "failure", 
               dataKey: "failureCount", 
-              stroke: statusColors.failure, 
+              stroke: colors.failure, 
               name: "Failed Orders",
               visible: paymentStatuses.includes("failure")
             },
             { 
               id: "refund", 
               dataKey: "refundCount", 
-              stroke: statusColors.refund, 
+              stroke: colors.refund, 
               name: "Refunded Orders",
               visible: paymentStatuses.includes("refund")
             }
@@ -284,65 +352,63 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
   const yAxisConfig = getYAxisConfig();
 
   return (
-    <Card className="p-4">
-      <div className="mb-4">
-        <h2 className="text-xl font-bold">Payment Trend</h2>
-        <p className="text-sm text-muted-foreground">
-          {viewType === "method" 
-            ? (yAxisMetric === "percentVolume" 
-              ? "Payment method volume trends over time"
-              : "Payment method order counts over time")
-            : (yAxisMetric === "percentVolume" 
-              ? "Payment status volume trends over time" 
-              : "Payment status order counts over time")}
-        </p>
-      </div>
-      
-      <div className="h-[400px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={chartData}
-            margin={{
-              top: 5,
-              right: 30,
-              left: 20,
-              bottom: 5
-            }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="date" 
-              tickFormatter={(tick) => format(new Date(tick), "MMM dd")}
-            />
-            <YAxis 
-              domain={yAxisConfig.yAxisDomain}
-              label={{ 
-                value: yAxisConfig.yAxisLabel, 
-                angle: -90, 
-                position: 'insideLeft' 
-              }}
-            />
-            <Tooltip 
-              formatter={yAxisConfig.tooltipFormatter}
-              labelFormatter={(label) => format(new Date(label), "MMM dd, yyyy")}
-            />
-            <Legend />
-            
-            {linesToShow.map((line, index) => (
-              <Line
-                key={line.id}
-                type="monotone"
-                dataKey={line.dataKey}
-                stroke={line.stroke}
-                activeDot={{ r: 8 }}
-                name={line.name}
-                strokeWidth={2}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </Card>
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart
+        data={chartData}
+        margin={{
+          top: 20,
+          right: 30,
+          left: 20,
+          bottom: 20
+        }}
+      >
+        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+        <XAxis 
+          dataKey="date" 
+          tickFormatter={(tick) => format(new Date(tick), "MMM dd")}
+          stroke="#64748b"
+          fontSize={12}
+        />
+        <YAxis 
+          domain={yAxisConfig.yAxisDomain}
+          label={{ 
+            value: yAxisConfig.yAxisLabel, 
+            angle: -90, 
+            position: 'insideLeft',
+            style: { textAnchor: 'middle' }
+          }}
+          stroke="#64748b"
+          fontSize={12}
+        />
+        <Tooltip 
+          formatter={yAxisConfig.tooltipFormatter}
+          labelFormatter={(label) => format(new Date(label), "MMM dd, yyyy")}
+          contentStyle={{
+            backgroundColor: 'white',
+            border: '1px solid #e2e8f0',
+            borderRadius: '8px'
+          }}
+        />
+        <Legend 
+          wrapperStyle={{
+            paddingTop: '20px'
+          }}
+        />
+        
+        {linesToShow.map((line) => (
+          <Line
+            key={line.id}
+            type="monotone"
+            dataKey={line.dataKey}
+            stroke={line.stroke}
+            activeDot={{ r: 6 }}
+            name={line.name}
+            strokeWidth={2}
+            dot={{ r: 4 }}
+          />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
   );
 };
 

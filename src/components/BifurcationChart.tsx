@@ -19,6 +19,7 @@ interface BifurcationChartProps {
   data: any[];
   emiTypes: string[];
   cardTypes: string[];
+  paymentMethods: string[];
   onRefresh?: () => void;
 }
 
@@ -26,6 +27,7 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
   data, 
   emiTypes, 
   cardTypes,
+  paymentMethods,
   onRefresh 
 }) => {
   // Prepare chart data based on selected filters
@@ -42,9 +44,12 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
           standardEmi: 0,
           noCostEmi: 0,
           shopseEmi: 0,
-          // Card types
+          // Card types (for both regular cards and EMI)
           creditCard: 0,
-          debitCard: 0
+          debitCard: 0,
+          // EMI card types
+          emiCreditCard: 0,
+          emiDebitCard: 0
         };
       }
       
@@ -57,8 +62,23 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
       
       // Count card types
       if (cardTypes.length > 0) {
-        if (item.paymentMethod === "creditCard") acc[dateStr].creditCard += 1;
-        if (item.paymentMethod === "debitCard") acc[dateStr].debitCard += 1;
+        // For regular card payments
+        if (item.paymentMethod === "creditCard" && cardTypes.includes("credit")) {
+          acc[dateStr].creditCard += 1;
+        }
+        if (item.paymentMethod === "debitCard" && cardTypes.includes("debit")) {
+          acc[dateStr].debitCard += 1;
+        }
+        
+        // For EMI payments with card type bifurcation
+        if (paymentMethods.includes("emi") && item.paymentMethod === "emi") {
+          if (item.cardType === "credit" && cardTypes.includes("credit")) {
+            acc[dateStr].emiCreditCard += 1;
+          }
+          if (item.cardType === "debit" && cardTypes.includes("debit")) {
+            acc[dateStr].emiDebitCard += 1;
+          }
+        }
       }
       
       return acc;
@@ -66,7 +86,7 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
     
     return Object.values(dateGroups)
       .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [data, emiTypes, cardTypes]);
+  }, [data, emiTypes, cardTypes, paymentMethods]);
 
   // Define colors for different lines
   const colors = {
@@ -74,20 +94,31 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
     noCostEmi: "#10B981", 
     shopseEmi: "#F59E0B",
     creditCard: "#8B5CF6",
-    debitCard: "#EC4899"
+    debitCard: "#EC4899",
+    emiCreditCard: "#9333EA",
+    emiDebitCard: "#F97316"
   };
 
   // Determine chart title and description
   const getChartInfo = () => {
-    if (emiTypes.length > 0 && cardTypes.length > 0) {
+    const hasEmiTypes = emiTypes.length > 0;
+    const hasCardTypes = cardTypes.length > 0;
+    const hasEmiMethod = paymentMethods.includes("emi");
+    
+    if (hasEmiTypes && hasCardTypes && hasEmiMethod) {
       return {
         title: "EMI Type & Card Type Bifurcation",
-        description: "Transaction count trends for selected EMI types and card types"
+        description: "Transaction count trends for selected EMI types and card types (including EMI card bifurcation)"
       };
-    } else if (emiTypes.length > 0) {
+    } else if (hasEmiTypes) {
       return {
         title: "EMI Type Bifurcation", 
         description: "Transaction count trends for selected EMI types"
+      };
+    } else if (hasCardTypes && hasEmiMethod) {
+      return {
+        title: "EMI Card Type Bifurcation",
+        description: "Transaction count trends for EMI transactions by card type"
       };
     } else {
       return {
@@ -208,8 +239,8 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
               />
             )}
             
-            {/* Card Type Lines */}
-            {cardTypes.includes("credit") && (
+            {/* Regular Card Type Lines */}
+            {cardTypes.includes("credit") && !paymentMethods.includes("emi") && (
               <Line
                 type="monotone"
                 dataKey="creditCard"
@@ -220,13 +251,37 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
                 dot={{ r: 4 }}
               />
             )}
-            {cardTypes.includes("debit") && (
+            {cardTypes.includes("debit") && !paymentMethods.includes("emi") && (
               <Line
                 type="monotone"
                 dataKey="debitCard"
                 stroke={colors.debitCard}
                 activeDot={{ r: 6 }}
                 name="Debit Card"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+              />
+            )}
+            
+            {/* EMI Card Type Lines */}
+            {cardTypes.includes("credit") && paymentMethods.includes("emi") && (
+              <Line
+                type="monotone"
+                dataKey="emiCreditCard"
+                stroke={colors.emiCreditCard}
+                activeDot={{ r: 6 }}
+                name="EMI Credit Card"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+              />
+            )}
+            {cardTypes.includes("debit") && paymentMethods.includes("emi") && (
+              <Line
+                type="monotone"
+                dataKey="emiDebitCard"
+                stroke={colors.emiDebitCard}
+                activeDot={{ r: 6 }}
+                name="EMI Debit Card"
                 strokeWidth={2}
                 dot={{ r: 4 }}
               />

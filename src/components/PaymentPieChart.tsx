@@ -78,20 +78,35 @@ const PaymentPieChart: React.FC<PaymentPieChartProps> = ({ data, paymentStatuses
     }
   });
   
-  // Convert to array and sort by count (descending), then take top 5
+  // Convert to array and sort by count (descending)
   const sortedReasons = Object.entries(failureReasons)
-    .sort(([,a], [,b]) => b - a)
-    .slice(0, 5);
+    .sort(([,a], [,b]) => b - a);
   
-  // Define colors for top 5 reasons
-  const colors = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"];
+  // Take top 5 and group the rest as "Others"
+  const top5Reasons = sortedReasons.slice(0, 5);
+  const otherReasons = sortedReasons.slice(5);
+  
+  // Calculate others count
+  const othersCount = otherReasons.reduce((sum, [, count]) => sum + count, 0);
+  
+  // Define colors for top 5 reasons + others
+  const colors = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40"];
   
   // Format data for the pie chart
-  const chartData: ChartDataItem[] = sortedReasons.map(([reason, count], index) => ({
+  const chartData: ChartDataItem[] = top5Reasons.map(([reason, count], index) => ({
     name: reason,
     value: count,
     color: colors[index] || "#FF9F40"
   }));
+  
+  // Add "Others" if there are more than 5 reasons
+  if (othersCount > 0) {
+    chartData.push({
+      name: "Others",
+      value: othersCount,
+      color: colors[5] || "#FF9F40"
+    });
+  }
   
   // If no failure data
   if (chartData.length === 0) {
@@ -109,9 +124,13 @@ const PaymentPieChart: React.FC<PaymentPieChartProps> = ({ data, paymentStatuses
   return (
     <Card className="p-6 shadow-sm border-slate-200">
       <div className="mb-4">
-        <h2 className="text-xl font-semibold text-slate-800">Top 5 Failure Reasons</h2>
+        <h2 className="text-xl font-semibold text-slate-800">
+          {othersCount > 0 ? "Top 5 Failure Reasons + Others" : "Failure Reasons"}
+        </h2>
         <p className="text-sm text-slate-600">
-          Distribution of payment failures by reason (showing top 5 only)
+          {othersCount > 0 
+            ? "Distribution of payment failures by reason (top 5 + others)" 
+            : "Distribution of payment failures by reason"}
         </p>
       </div>
       
@@ -133,7 +152,11 @@ const PaymentPieChart: React.FC<PaymentPieChartProps> = ({ data, paymentStatuses
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />
-            <Legend />
+            <Legend 
+              wrapperStyle={{
+                paddingTop: '20px'
+              }}
+            />
           </PieChart>
         </ResponsiveContainer>
       </div>
