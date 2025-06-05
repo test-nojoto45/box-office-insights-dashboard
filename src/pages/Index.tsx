@@ -17,6 +17,7 @@ import { mockData } from "@/data/mockData";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import ChartDisplay from "@/components/ChartDisplay";
+import BifurcationChart from "@/components/BifurcationChart";
 
 // Define type for the summary data
 interface PaymentSummary {
@@ -47,6 +48,7 @@ const Index = () => {
   const [paymentGateways, setPaymentGateways] = useState<string[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [emiTypes, setEmiTypes] = useState<string[]>([]);
+  const [cardTypes, setCardTypes] = useState<string[]>([]); // New card type filter
   const [paymentStatuses, setPaymentStatuses] = useState<string[]>(["success"]);
   
   // State for view toggle
@@ -96,17 +98,36 @@ const Index = () => {
         return false;
       }
       
+      // Handle card type filtering
+      const cardTypeMatches = () => {
+        if (cardTypes.length === 0) return true;
+        if (item.paymentMethod === "creditCard" && cardTypes.includes("credit")) return true;
+        if (item.paymentMethod === "debitCard" && cardTypes.includes("debit")) return true;
+        return false;
+      };
+      
       // For non-shopse EMI types
       const emiSelected = emiTypes.length > 0 && !shopseSelected;
-      const cardOrEmiSelected = paymentMethods.includes("creditCard") || 
-                              paymentMethods.includes("debitCard") ||
-                              paymentMethods.includes("emi");
+      const cardOrEmiSelected = paymentMethods.includes("cards") || paymentMethods.includes("emi");
       const isEmiCompatible = !emiSelected || 
         ((item.paymentMethod === "creditCard" || 
           item.paymentMethod === "debitCard" ||
           item.paymentMethod === "emi") && 
           includesOrEmpty(emiTypes, item.emiType) && 
           item.emiType !== "shopse");
+      
+      // Handle payment method filtering with card combination
+      const paymentMethodMatches = () => {
+        if (paymentMethods.length === 0) return true;
+        
+        if (paymentMethods.includes("cards")) {
+          if (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard") {
+            return cardTypeMatches();
+          }
+        }
+        
+        return paymentMethods.includes(item.paymentMethod);
+      };
       
       // If EMI types (other than shopse) are selected but no card/emi payment methods are selected, 
       // filter out non-compatible items
@@ -127,7 +148,7 @@ const Index = () => {
         matchesOrEmpty(lob, item.lob) &&
         matchesOrEmpty(insurer, item.insurer) &&
         includesOrEmpty(paymentGateways, item.paymentGateway) &&
-        includesOrEmpty(paymentMethods, item.paymentMethod) &&
+        paymentMethodMatches() &&
         isEmiCompatible &&
         (paymentStatuses.includes("refund") ? 
           (item.isRefunded || includesOrEmpty(paymentStatuses, item.status)) :
@@ -142,7 +163,7 @@ const Index = () => {
     });
     
     setFilteredData(filtered);
-  }, [businessType, lob, insurer, paymentGateways, paymentMethods, emiTypes, paymentStatuses, dateRange]);
+  }, [businessType, lob, insurer, paymentGateways, paymentMethods, emiTypes, cardTypes, paymentStatuses, dateRange]);
 
   // Helper function to check if an array includes a value or is empty
   const includesOrEmpty = (arr: string[], value: string) => {
@@ -183,6 +204,7 @@ const Index = () => {
       case "upi": return "UPI";
       case "wallet": return "Wallet";
       case "emi": return "EMI";
+      case "cards": return "Cards";
       default: return method;
     }
   };
@@ -239,24 +261,20 @@ const Index = () => {
       const newEmiTypes = [emiType];
       setEmiTypes(newEmiTypes);
       
-      const hasCardOrEmiMethod = paymentMethods.includes("creditCard") || 
-                             paymentMethods.includes("debitCard") ||
-                             paymentMethods.includes("emi");
+      const hasCardOrEmiMethod = paymentMethods.includes("cards") || paymentMethods.includes("emi");
       
       if (!hasCardOrEmiMethod) {
-        setPaymentMethods(prev => [...prev, "creditCard"]);
+        setPaymentMethods(prev => [...prev, "cards"]);
       }
       
       return;
     }
     
     if (emiType !== "shopse") {
-      const hasCardOrEmiMethod = paymentMethods.includes("creditCard") || 
-                             paymentMethods.includes("debitCard") ||
-                             paymentMethods.includes("emi");
+      const hasCardOrEmiMethod = paymentMethods.includes("cards") || paymentMethods.includes("emi");
       
       if (!hasCardOrEmiMethod && !emiTypes.includes(emiType)) {
-        setPaymentMethods(prev => [...prev, "creditCard"]);
+        setPaymentMethods(prev => [...prev, "cards"]);
       }
     }
     
@@ -288,6 +306,7 @@ const Index = () => {
     setPaymentGateways([]);
     setPaymentMethods([]);
     setEmiTypes([]);
+    setCardTypes([]);
     setPaymentStatuses(["success"]);
     setDateRange({
       from: new Date(2024, 4, 1),
@@ -324,6 +343,9 @@ const Index = () => {
   
   // Check if we should show refund details based on status filter
   const showRefundDetails = paymentStatuses.length === 1 && paymentStatuses.includes("refund");
+
+  // Check if we should show bifurcation chart
+  const showBifurcationChart = emiTypes.length > 0 || cardTypes.length > 0;
 
   // Add refresh function
   const handleRefresh = () => {
@@ -498,11 +520,11 @@ const Index = () => {
                     </Select>
                   </div>
                   
-                  {/* Payment Method - Updated to handle shopse constraint */}
+                  {/* Payment Method - Updated to combine cards */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Payment Method</Label>
                     <div className="space-y-2">
-                      {["creditCard", "debitCard", "netBanking", "upi", "wallet", "emi"].map((method) => (
+                      {["cards", "netBanking", "upi", "wallet", "emi"].map((method) => (
                         <div key={method} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`dialog-method-${method}`}
@@ -518,6 +540,31 @@ const Index = () => {
                       {emiTypes.includes("shopse") && (
                         <p className="text-xs text-muted-foreground mt-1">
                           Only EMI payment method allowed with Shopse
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card Type Filter - New */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Card Type</Label>
+                    <div className="space-y-2">
+                      {["credit", "debit"].map((cardType) => (
+                        <div key={cardType} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`dialog-cardtype-${cardType}`}
+                            checked={cardTypes.includes(cardType)}
+                            onCheckedChange={() => handleCheckboxToggle(cardType, cardTypes, setCardTypes)}
+                            disabled={!paymentMethods.includes("cards")}
+                          />
+                          <label htmlFor={`dialog-cardtype-${cardType}`} className="text-sm leading-none cursor-pointer capitalize">
+                            {cardType} Card
+                          </label>
+                        </div>
+                      ))}
+                      {!paymentMethods.includes("cards") && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Select "Cards" in Payment Method to enable card type filtering
                         </p>
                       )}
                     </div>
@@ -697,6 +744,16 @@ const Index = () => {
           />
         </TabsContent>
       </Tabs>
+
+      {/* Bifurcation Chart - New section */}
+      {showBifurcationChart && (
+        <BifurcationChart 
+          data={filteredData}
+          emiTypes={emiTypes}
+          cardTypes={cardTypes}
+          onRefresh={handleRefresh}
+        />
+      )}
       
       {/* Summary Table */}
       <Card className="p-4">

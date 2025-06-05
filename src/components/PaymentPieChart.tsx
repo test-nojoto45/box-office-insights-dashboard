@@ -9,7 +9,6 @@ import {
   ResponsiveContainer 
 } from "recharts";
 import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 
 // Define interfaces for our data
 interface FailureReason {
@@ -42,13 +41,12 @@ interface PaymentPieChartProps {
 const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     const data = payload[0];
-    const totalCount = payload.reduce((sum, entry) => sum + (entry.value || 0), 0);
     
     return (
       <div className="custom-tooltip bg-white p-3 border border-gray-200 rounded-md shadow">
         <p className="font-medium">{data.name}</p>
         <p>{`Count: ${data.value}`}</p>
-        <p>{`Percentage: ${((data.value / totalCount) * 100).toFixed(1)}%`}</p>
+        <p>{`Percentage: ${((data.value / payload.reduce((sum, entry) => sum + (entry.value || 0), 0)) * 100).toFixed(1)}%`}</p>
       </div>
     );
   }
@@ -70,42 +68,35 @@ const PaymentPieChart: React.FC<PaymentPieChartProps> = ({ data, paymentStatuses
     );
   }
   
-  // Extract failure data
-  const failureReasons: FailureReason[] = [
-    { reason: "Payment Gateway Error", count: 0, color: "#FF6384" },
-    { reason: "Insufficient Funds", count: 0, color: "#36A2EB" },
-    { reason: "Card Declined", count: 0, color: "#FFCE56" },
-    { reason: "Authentication Failed", count: 0, color: "#4BC0C0" },
-    { reason: "Network Error", count: 0, color: "#9966FF" },
-    { reason: "Other", count: 0, color: "#FF9F40" }
-  ];
+  // Extract failure data and count occurrences
+  const failureReasons: Record<string, number> = {};
   
-  // Count failure reasons
   data.forEach(item => {
     if (item.status === "failure") {
-      const reasonIndex = failureReasons.findIndex(r => r.reason === item.failureReason);
-      if (reasonIndex >= 0) {
-        failureReasons[reasonIndex].count++;
-      } else {
-        failureReasons[5].count++; // "Other" category
-      }
+      const reason = item.failureReason || "Other";
+      failureReasons[reason] = (failureReasons[reason] || 0) + 1;
     }
   });
   
-  // Filter out reasons with zero count
-  const filteredReasons = failureReasons.filter(item => item.count > 0);
+  // Convert to array and sort by count (descending), then take top 5
+  const sortedReasons = Object.entries(failureReasons)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 5);
+  
+  // Define colors for top 5 reasons
+  const colors = ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"];
   
   // Format data for the pie chart
-  const chartData: ChartDataItem[] = filteredReasons.map(item => ({
-    name: item.reason,
-    value: item.count,
-    color: item.color
+  const chartData: ChartDataItem[] = sortedReasons.map(([reason, count], index) => ({
+    name: reason,
+    value: count,
+    color: colors[index] || "#FF9F40"
   }));
   
   // If no failure data
   if (chartData.length === 0) {
     return (
-      <Card className="p-4">
+      <Card className="p-6 shadow-sm border-slate-200">
         <div className="text-center py-8">
           <p>No failure data available for the selected filters</p>
         </div>
@@ -116,11 +107,11 @@ const PaymentPieChart: React.FC<PaymentPieChartProps> = ({ data, paymentStatuses
   const totalFailures = chartData.reduce((sum, item) => sum + item.value, 0);
   
   return (
-    <Card className="p-4">
+    <Card className="p-6 shadow-sm border-slate-200">
       <div className="mb-4">
-        <h2 className="text-xl font-bold">Failure Reasons</h2>
-        <p className="text-sm text-muted-foreground">
-          Distribution of payment failures by reason
+        <h2 className="text-xl font-semibold text-slate-800">Top 5 Failure Reasons</h2>
+        <p className="text-sm text-slate-600">
+          Distribution of payment failures by reason (showing top 5 only)
         </p>
       </div>
       
