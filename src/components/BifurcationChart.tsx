@@ -111,7 +111,7 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
 
   return (
     <Card className="p-6 shadow-sm border-slate-200">
-      <div className="mb-6">
+      <div className="mb-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-slate-800">{chartInfo.title}</h2>
@@ -130,34 +130,48 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
         </div>
       </div>
       
-      <div className="h-[400px]">
+      <div className="h-[400px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
             margin={{
-              top: 5,
+              top: 20,
               right: 30,
               left: 20,
-              bottom: 5
+              bottom: 20
             }}
           >
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis 
               dataKey="date" 
               tickFormatter={(tick) => format(new Date(tick), "MMM dd")}
+              stroke="#64748b"
+              fontSize={12}
             />
             <YAxis 
               label={{ 
                 value: "Number of Transactions", 
                 angle: -90, 
-                position: 'insideLeft' 
+                position: 'insideLeft',
+                style: { textAnchor: 'middle' }
               }}
+              stroke="#64748b"
+              fontSize={12}
             />
             <Tooltip 
-              formatter={(value: number) => value.toString()}
+              formatter={(value: number) => [value.toString(), '']}
               labelFormatter={(label) => format(new Date(label), "MMM dd, yyyy")}
+              contentStyle={{
+                backgroundColor: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px'
+              }}
             />
-            <Legend />
+            <Legend 
+              wrapperStyle={{
+                paddingTop: '20px'
+              }}
+            />
             
             {/* EMI Type Lines */}
             {emiTypes.includes("standard") && (
@@ -168,6 +182,7 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
                 activeDot={{ r: 6 }}
                 name="Standard EMI"
                 strokeWidth={2}
+                dot={{ r: 4 }}
               />
             )}
             {emiTypes.includes("noCost") && (
@@ -178,6 +193,7 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
                 activeDot={{ r: 6 }}
                 name="No Cost EMI"
                 strokeWidth={2}
+                dot={{ r: 4 }}
               />
             )}
             {emiTypes.includes("shopse") && (
@@ -188,6 +204,7 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
                 activeDot={{ r: 6 }}
                 name="Shopse"
                 strokeWidth={2}
+                dot={{ r: 4 }}
               />
             )}
             
@@ -200,6 +217,7 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
                 activeDot={{ r: 6 }}
                 name="Credit Card"
                 strokeWidth={2}
+                dot={{ r: 4 }}
               />
             )}
             {cardTypes.includes("debit") && (
@@ -210,6 +228,7 @@ const BifurcationChart: React.FC<BifurcationChartProps> = ({
                 activeDot={{ r: 6 }}
                 name="Debit Card"
                 strokeWidth={2}
+                dot={{ r: 4 }}
               />
             )}
           </LineChart>

@@ -210,7 +210,7 @@ const Index = () => {
   };
 
   // Modified to include policy count in summary
-  const prepareSummaryData = () => {
+  const prepareMainSummaryData = () => {
     const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
     const summary: Record<string, PaymentSummary> = {};
     
@@ -244,61 +244,62 @@ const Index = () => {
       }
     });
     
-    // If EMI types or card types are selected, add bifurcation data
-    if (emiTypes.length > 0 || cardTypes.length > 0) {
-      const bifurcationSummary: Record<string, PaymentSummary> = {};
-      
-      filteredData.forEach(item => {
-        let bifurcationKey = "";
-        
-        // Create bifurcation key based on selected filters
-        if (emiTypes.length > 0 && item.emiType && emiTypes.includes(item.emiType)) {
-          bifurcationKey = `${item.paymentMethod}-${item.emiType}`;
-        } else if (cardTypes.length > 0 && 
-                  ((item.paymentMethod === "creditCard" && cardTypes.includes("credit")) ||
-                   (item.paymentMethod === "debitCard" && cardTypes.includes("debit")))) {
-          const cardType = item.paymentMethod === "creditCard" ? "credit" : "debit";
-          bifurcationKey = `cards-${cardType}`;
-        }
-        
-        if (bifurcationKey) {
-          if (!bifurcationSummary[bifurcationKey]) {
-            bifurcationSummary[bifurcationKey] = {
-              totalTransactions: 0,
-              successCount: 0,
-              failureCount: 0,
-              refundCount: 0,
-              totalVolume: 0,
-              refundVolume: 0,
-              policyCount: 0,
-              emiType: emiTypes.length > 0 ? item.emiType : undefined,
-              paymentGateway: viewType === "method" ? item.paymentGateway : undefined
-            };
-          }
-          
-          const bifurcationItem = bifurcationSummary[bifurcationKey];
-          bifurcationItem.totalTransactions += 1;
-          bifurcationItem.totalVolume += item.amount;
-          bifurcationItem.policyCount += 1;
-          
-          if (item.status === "success") bifurcationItem.successCount += 1;
-          if (item.status === "failure") bifurcationItem.failureCount += 1;
-          if (item.isRefunded) {
-            bifurcationItem.refundCount += 1;
-            bifurcationItem.refundVolume += item.amount;
-          }
-        }
-      });
-      
-      // Merge bifurcation data with main summary
-      Object.assign(summary, bifurcationSummary);
-    }
-    
     return summary;
   };
+
+  const prepareBifurcationSummaryData = () => {
+    if (emiTypes.length === 0 && cardTypes.length === 0) return {};
+    
+    const bifurcationSummary: Record<string, PaymentSummary> = {};
+    
+    filteredData.forEach(item => {
+      let bifurcationKey = "";
+      
+      // Create bifurcation key based on selected filters
+      if (emiTypes.length > 0 && item.emiType && emiTypes.includes(item.emiType)) {
+        bifurcationKey = `${item.paymentMethod}-${item.emiType}`;
+      } else if (cardTypes.length > 0 && 
+                ((item.paymentMethod === "creditCard" && cardTypes.includes("credit")) ||
+                 (item.paymentMethod === "debitCard" && cardTypes.includes("debit")))) {
+        const cardType = item.paymentMethod === "creditCard" ? "credit" : "debit";
+        bifurcationKey = `cards-${cardType}`;
+      }
+      
+      if (bifurcationKey) {
+        if (!bifurcationSummary[bifurcationKey]) {
+          bifurcationSummary[bifurcationKey] = {
+            totalTransactions: 0,
+            successCount: 0,
+            failureCount: 0,
+            refundCount: 0,
+            totalVolume: 0,
+            refundVolume: 0,
+            policyCount: 0,
+            emiType: emiTypes.length > 0 ? item.emiType : undefined,
+            paymentGateway: viewType === "method" ? item.paymentGateway : undefined
+          };
+        }
+        
+        const bifurcationItem = bifurcationSummary[bifurcationKey];
+        bifurcationItem.totalTransactions += 1;
+        bifurcationItem.totalVolume += item.amount;
+        bifurcationItem.policyCount += 1;
+        
+        if (item.status === "success") bifurcationItem.successCount += 1;
+        if (item.status === "failure") bifurcationItem.failureCount += 1;
+        if (item.isRefunded) {
+          bifurcationItem.refundCount += 1;
+          bifurcationItem.refundVolume += item.amount;
+        }
+      }
+    });
+    
+    return bifurcationSummary;
+  };
   
-  // Get summary data based on current view type
-  const summaryData = prepareSummaryData();
+  // Get summary data
+  const mainSummaryData = prepareMainSummaryData();
+  const bifurcationSummaryData = prepareBifurcationSummaryData();
 
   // Helper function to handle EMI type selection
   const handleEmiTypeToggle = (emiType: string) => {
@@ -606,16 +607,16 @@ const Index = () => {
                             id={`dialog-cardtype-${cardType}`}
                             checked={cardTypes.includes(cardType)}
                             onCheckedChange={() => handleCheckboxToggle(cardType, cardTypes, setCardTypes)}
-                            disabled={!paymentMethods.includes("cards")}
+                            disabled={!paymentMethods.includes("cards") && !paymentMethods.includes("emi")}
                           />
                           <label htmlFor={`dialog-cardtype-${cardType}`} className="text-sm leading-none cursor-pointer capitalize">
                             {cardType} Card
                           </label>
                         </div>
                       ))}
-                      {!paymentMethods.includes("cards") && (
+                      {!paymentMethods.includes("cards") && !paymentMethods.includes("emi") && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          Select "Cards" in Payment Method to enable card type filtering
+                          Select "Cards" or "EMI" in Payment Method to enable card type filtering
                         </p>
                       )}
                     </div>
@@ -806,7 +807,7 @@ const Index = () => {
         />
       )}
       
-      {/* Summary Table */}
+      {/* Main Summary Table */}
       <Card className="p-4">
         <h2 className="text-xl font-bold mb-4">
           {viewType === "gateway" ? "Payment Gateway Summary" : "Payment Method Summary"}
@@ -816,10 +817,6 @@ const Index = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>{viewType === "gateway" ? "Payment Gateway" : "Payment Method"}</TableHead>
-                {(emiTypes.length > 0 || cardTypes.length > 0) && <TableHead>Type</TableHead>}
-                {viewType === "method" && showFailureDetails && (
-                  <TableHead>Payment Gateway</TableHead>
-                )}
                 <TableHead>Total Transactions</TableHead>
                 <TableHead>Total Volume</TableHead>
                 {showRefundDetails ? (
@@ -833,62 +830,114 @@ const Index = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Object.entries(summaryData).map(([key, data]) => {
-                // Extract the payment method/gateway name and type
-                const isDetailedKey = key.includes('-');
-                const displayName = isDetailedKey ? key.split('-')[0] : key;
-                const typeDetail = isDetailedKey ? key.split('-')[1] : null;
-                
-                // Format type detail for display
-                const formatTypeDetail = (type: string) => {
-                  if (emiTypes.length > 0) {
-                    return formatEmiTypeName(type);
-                  } else if (cardTypes.length > 0) {
-                    return type === "credit" ? "Credit Card" : "Debit Card";
-                  }
-                  return type;
-                };
-                
-                return (
-                  <TableRow key={key}>
-                    <TableCell className="font-medium">
-                      {formatMethodName(displayName)}
-                    </TableCell>
-                    {(emiTypes.length > 0 || cardTypes.length > 0) && (
+              {Object.entries(mainSummaryData).map(([key, data]) => (
+                <TableRow key={key}>
+                  <TableCell className="font-medium">
+                    {formatMethodName(key)}
+                  </TableCell>
+                  <TableCell>{data.totalTransactions}</TableCell>
+                  <TableCell>{formatCurrency(data.totalVolume)}</TableCell>
+                  {showRefundDetails ? (
+                    <TableCell>{data.refundCount}</TableCell>
+                  ) : (!showFailureDetails && (
+                    <>
                       <TableCell>
-                        {typeDetail ? formatTypeDetail(typeDetail) : "All"}
+                        {data.totalTransactions > 0 
+                          ? ((data.successCount / data.totalTransactions) * 100).toFixed(1) 
+                          : 0}%
                       </TableCell>
-                    )}
-                    {viewType === "method" && showFailureDetails && (
                       <TableCell>
-                        {data.paymentGateway || "N/A"}
+                        {data.totalTransactions > 0 
+                          ? ((data.failureCount / data.totalTransactions) * 100).toFixed(1) 
+                          : 0}%
                       </TableCell>
-                    )}
-                    <TableCell>{data.totalTransactions}</TableCell>
-                    <TableCell>{formatCurrency(data.totalVolume)}</TableCell>
-                    {showRefundDetails ? (
-                      <TableCell>{data.refundCount}</TableCell>
-                    ) : (!showFailureDetails && (
-                      <>
-                        <TableCell>
-                          {data.totalTransactions > 0 
-                            ? ((data.successCount / data.totalTransactions) * 100).toFixed(1) 
-                            : 0}%
-                        </TableCell>
-                        <TableCell>
-                          {data.totalTransactions > 0 
-                            ? ((data.failureCount / data.totalTransactions) * 100).toFixed(1) 
-                            : 0}%
-                        </TableCell>
-                      </>
-                    ))}
-                  </TableRow>
-                );
-              })}
+                    </>
+                  ))}
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
       </Card>
+
+      {/* Bifurcation Summary Table */}
+      {Object.keys(bifurcationSummaryData).length > 0 && (
+        <Card className="p-4">
+          <h2 className="text-xl font-bold mb-4">
+            {emiTypes.length > 0 && cardTypes.length > 0 
+              ? "EMI Type & Card Type Summary" 
+              : emiTypes.length > 0 
+                ? "EMI Type Summary" 
+                : "Card Type Summary"}
+          </h2>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  {viewType === "method" && showFailureDetails && (
+                    <TableHead>Payment Gateway</TableHead>
+                  )}
+                  <TableHead>Total Transactions</TableHead>
+                  <TableHead>Total Volume</TableHead>
+                  {showRefundDetails ? (
+                    <TableHead>Refund Count</TableHead>
+                  ) : (!showFailureDetails && (
+                    <>
+                      <TableHead>Success%</TableHead>
+                      <TableHead>Failure%</TableHead>
+                    </>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Object.entries(bifurcationSummaryData).map(([key, data]) => {
+                  const typeDetail = key.split('-')[1];
+                  const formatTypeDetail = (type: string) => {
+                    if (emiTypes.length > 0) {
+                      return formatEmiTypeName(type);
+                    } else if (cardTypes.length > 0) {
+                      return type === "credit" ? "Credit Card" : "Debit Card";
+                    }
+                    return type;
+                  };
+                  
+                  return (
+                    <TableRow key={key}>
+                      <TableCell className="font-medium">
+                        {formatTypeDetail(typeDetail)}
+                      </TableCell>
+                      {viewType === "method" && showFailureDetails && (
+                        <TableCell>
+                          {data.paymentGateway || "N/A"}
+                        </TableCell>
+                      )}
+                      <TableCell>{data.totalTransactions}</TableCell>
+                      <TableCell>{formatCurrency(data.totalVolume)}</TableCell>
+                      {showRefundDetails ? (
+                        <TableCell>{data.refundCount}</TableCell>
+                      ) : (!showFailureDetails && (
+                        <>
+                          <TableCell>
+                            {data.totalTransactions > 0 
+                              ? ((data.successCount / data.totalTransactions) * 100).toFixed(1) 
+                              : 0}%
+                          </TableCell>
+                          <TableCell>
+                            {data.totalTransactions > 0 
+                              ? ((data.failureCount / data.totalTransactions) * 100).toFixed(1) 
+                              : 0}%
+                          </TableCell>
+                        </>
+                      ))}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
