@@ -787,6 +787,7 @@ const Index = () => {
             viewType="gateway" 
             paymentStatuses={paymentStatuses}
             emiTypes={emiTypes}
+            paymentMethods={paymentMethods}
             onRefresh={handleRefresh}
           />
         </TabsContent>
@@ -797,6 +798,7 @@ const Index = () => {
             viewType="method" 
             paymentStatuses={paymentStatuses}
             emiTypes={emiTypes}
+            paymentMethods={paymentMethods}
             onRefresh={handleRefresh}
           />
         </TabsContent>
@@ -808,6 +810,7 @@ const Index = () => {
           data={filteredData}
           emiTypes={emiTypes}
           cardTypes={cardTypes}
+          paymentMethods={paymentMethods}
           onRefresh={handleRefresh}
         />
       )}
