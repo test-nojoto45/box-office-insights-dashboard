@@ -214,6 +214,7 @@ const Index = () => {
     const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
     const summary: Record<string, PaymentSummary> = {};
     
+    // First, group by the main dimension (gateway or method)
     filteredData.forEach(item => {
       const key = item[groupBy];
       
@@ -242,6 +243,56 @@ const Index = () => {
         summaryItem.refundVolume += item.amount;
       }
     });
+    
+    // If EMI types or card types are selected, add bifurcation data
+    if (emiTypes.length > 0 || cardTypes.length > 0) {
+      const bifurcationSummary: Record<string, PaymentSummary> = {};
+      
+      filteredData.forEach(item => {
+        let bifurcationKey = "";
+        
+        // Create bifurcation key based on selected filters
+        if (emiTypes.length > 0 && item.emiType && emiTypes.includes(item.emiType)) {
+          bifurcationKey = `${item.paymentMethod}-${item.emiType}`;
+        } else if (cardTypes.length > 0 && 
+                  ((item.paymentMethod === "creditCard" && cardTypes.includes("credit")) ||
+                   (item.paymentMethod === "debitCard" && cardTypes.includes("debit")))) {
+          const cardType = item.paymentMethod === "creditCard" ? "credit" : "debit";
+          bifurcationKey = `cards-${cardType}`;
+        }
+        
+        if (bifurcationKey) {
+          if (!bifurcationSummary[bifurcationKey]) {
+            bifurcationSummary[bifurcationKey] = {
+              totalTransactions: 0,
+              successCount: 0,
+              failureCount: 0,
+              refundCount: 0,
+              totalVolume: 0,
+              refundVolume: 0,
+              policyCount: 0,
+              emiType: emiTypes.length > 0 ? item.emiType : undefined,
+              paymentGateway: viewType === "method" ? item.paymentGateway : undefined
+            };
+          }
+          
+          const bifurcationItem = bifurcationSummary[bifurcationKey];
+          bifurcationItem.totalTransactions += 1;
+          bifurcationItem.totalVolume += item.amount;
+          bifurcationItem.policyCount += 1;
+          
+          if (item.status === "success") bifurcationItem.successCount += 1;
+          if (item.status === "failure") bifurcationItem.failureCount += 1;
+          if (item.isRefunded) {
+            bifurcationItem.refundCount += 1;
+            bifurcationItem.refundVolume += item.amount;
+          }
+        }
+      });
+      
+      // Merge bifurcation data with main summary
+      Object.assign(summary, bifurcationSummary);
+    }
     
     return summary;
   };
@@ -765,7 +816,7 @@ const Index = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>{viewType === "gateway" ? "Payment Gateway" : "Payment Method"}</TableHead>
-                {emiTypes.length > 0 && <TableHead>EMI Type</TableHead>}
+                {(emiTypes.length > 0 || cardTypes.length > 0) && <TableHead>Type</TableHead>}
                 {viewType === "method" && showFailureDetails && (
                   <TableHead>Payment Gateway</TableHead>
                 )}
@@ -783,24 +834,34 @@ const Index = () => {
             </TableHeader>
             <TableBody>
               {Object.entries(summaryData).map(([key, data]) => {
-                // Extract the payment method/gateway name
-                const displayName = key.includes('-') && (data.emiType || data.paymentGateway) 
-                  ? key.split('-')[0] 
-                  : key;
+                // Extract the payment method/gateway name and type
+                const isDetailedKey = key.includes('-');
+                const displayName = isDetailedKey ? key.split('-')[0] : key;
+                const typeDetail = isDetailedKey ? key.split('-')[1] : null;
+                
+                // Format type detail for display
+                const formatTypeDetail = (type: string) => {
+                  if (emiTypes.length > 0) {
+                    return formatEmiTypeName(type);
+                  } else if (cardTypes.length > 0) {
+                    return type === "credit" ? "Credit Card" : "Debit Card";
+                  }
+                  return type;
+                };
                 
                 return (
                   <TableRow key={key}>
                     <TableCell className="font-medium">
                       {formatMethodName(displayName)}
                     </TableCell>
-                    {emiTypes.length > 0 && (
+                    {(emiTypes.length > 0 || cardTypes.length > 0) && (
                       <TableCell>
-                        {data.emiType && data.emiType !== "none" ? formatEmiTypeName(data.emiType) : "N/A"}
+                        {typeDetail ? formatTypeDetail(typeDetail) : "All"}
                       </TableCell>
                     )}
                     {viewType === "method" && showFailureDetails && (
                       <TableCell>
-                        {data.paymentGateway || (key.includes('-') ? key.split('-')[1] : "N/A")}
+                        {data.paymentGateway || "N/A"}
                       </TableCell>
                     )}
                     <TableCell>{data.totalTransactions}</TableCell>
