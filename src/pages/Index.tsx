@@ -322,6 +322,12 @@ const Index = () => {
       return;
     }
     
+    // Allow all EMI types to be selected when EMI method is selected
+    if (emiType !== "shopse" && paymentMethods.includes("emi")) {
+      handleCheckboxToggle(emiType, emiTypes, setEmiTypes);
+      return;
+    }
+    
     if (emiType !== "shopse") {
       const hasCardOrEmiMethod = paymentMethods.includes("cards") || paymentMethods.includes("emi");
       
@@ -597,7 +603,7 @@ const Index = () => {
                     </div>
                   </div>
 
-                  {/* Card Type Filter - Updated to enable when EMI is selected */}
+                  {/* Card Type Filter - Updated to enable when cards or EMI is selected */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Card Type</Label>
                     <div className="space-y-2">
@@ -619,6 +625,11 @@ const Index = () => {
                           Select "Cards" or "EMI" in Payment Method to enable card type filtering
                         </p>
                       )}
+                      {paymentMethods.includes("cards") && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Card type shows bifurcation for credit and debit cards
+                        </p>
+                      )}
                       {paymentMethods.includes("emi") && (
                         <p className="text-xs text-muted-foreground mt-1">
                           Card type applies to EMI transactions as well
@@ -627,7 +638,7 @@ const Index = () => {
                     </div>
                   </div>
                   
-                  {/* EMI Type - Updated to handle shopse payment method constraint */}
+                  {/* EMI Type - Updated to allow all selections when EMI is selected */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">EMI Type</Label>
                     <div className="space-y-2">
@@ -648,6 +659,8 @@ const Index = () => {
                       <p className="text-xs text-muted-foreground mt-1">
                         {emiTypes.includes("shopse") ? 
                           "Shopse requires EMI payment method" : 
+                          paymentMethods.includes("emi") ? 
+                          "All EMI types can be selected when EMI payment method is chosen" :
                           "Standard/No Cost EMI types only apply to credit/debit cards and EMI method"}
                       </p>
                     </div>

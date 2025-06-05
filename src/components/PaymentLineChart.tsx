@@ -72,7 +72,12 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
       
       // Track data by payment method for "method" view
       if (viewType === "method") {
-        const method = item.paymentMethod;
+        // Group credit and debit cards under "cards" when cards filter is selected
+        let method = item.paymentMethod;
+        if (paymentMethods.includes("cards") && (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard")) {
+          method = "cards";
+        }
+        
         if (!acc[dateStr].methodData[method]) {
           acc[dateStr].methodData[method] = {
             amount: 0,
@@ -146,7 +151,7 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
         return processedGroup;
       })
       .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [data, viewType]);
+  }, [data, viewType, paymentMethods]);
 
   // Empty state check
   if (chartData.length === 0) {
@@ -194,18 +199,23 @@ const PaymentLineChart: React.FC<PaymentLineChartProps> = ({
   const getLinesToShow = () => {
     // If we're in payment method view
     if (viewType === "method") {
-      // Get unique payment methods from the data, filtered by selected payment methods
+      // Get unique payment methods from the data, but handle cards grouping
       let paymentMethodsToShow = Array.from(
-        new Set(data.map(item => item.paymentMethod))
+        new Set(data.map(item => {
+          // Group credit and debit cards under "cards" when cards filter is selected
+          if (paymentMethods.includes("cards") && (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard")) {
+            return "cards";
+          }
+          return item.paymentMethod;
+        }))
       );
       
       // If specific payment methods are selected, filter to only show those
       if (paymentMethods.length > 0) {
-        // Handle the special case of "cards" which should show both creditCard and debitCard
         const expandedMethods = [];
         for (const method of paymentMethods) {
           if (method === "cards") {
-            expandedMethods.push("creditCard", "debitCard");
+            expandedMethods.push("cards");
           } else {
             expandedMethods.push(method);
           }
