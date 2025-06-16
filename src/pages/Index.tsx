@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import NavigationBar from "@/components/NavigationBar";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { mockData } from "@/data/mockData";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import { addDays, format, isWithinInterval, parseISO, subDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
