@@ -11,7 +11,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
-import PaymentLineChart from "@/components/PaymentLineChart";
+import PaymentStackedBarChart from "@/components/PaymentStackedBarChart";
 import PaymentPieChart from "@/components/PaymentPieChart";
 
 interface ChartDisplayProps {
@@ -77,7 +77,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
           </div>
           
           <div className="h-[400px] w-full">
-            <PaymentLineChart 
+            <PaymentStackedBarChart 
               data={data} 
               viewType={viewType} 
               yAxisMetric={yAxisMetric}
@@ -130,7 +130,7 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
       </div>
       
       <div className="h-[400px] w-full">
-        <PaymentLineChart 
+        <PaymentStackedBarChart 
           data={data} 
           viewType={viewType} 
           yAxisMetric={yAxisMetric}
