@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { format } from "date-fns";
 import {
@@ -229,9 +228,9 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
   const getStackColor = (key: string) => {
     if (key.includes("_")) {
       const [method, type] = key.split("_");
-      return colors[type] || colors[method] || colors.default;
+      return colors[type as keyof typeof colors] || colors[method as keyof typeof colors] || "#666";
     }
-    return colors[key] || "#666";
+    return colors[key as keyof typeof colors] || "#666";
   };
 
   // Determine which stacks to show

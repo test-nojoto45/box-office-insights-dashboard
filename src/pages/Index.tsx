@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import NavigationBar from "@/components/NavigationBar";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mockPaymentData } from "@/data/mockPaymentData";
+import { mockData } from "@/data/mockData";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { addDays, format, isWithinInterval, parseISO, subDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -50,9 +50,9 @@ const Index = () => {
 
   // Filter data based on selected criteria
   const filteredData = useMemo(() => {
-    return mockPaymentData.filter(item => {
+    return mockData.filter(item => {
       // Date range filtering
-      const paymentDate = parseISO(item.date);
+      const paymentDate = new Date(item.date);
       if (!isWithinInterval(paymentDate, { start: dateRange.from, end: dateRange.to })) {
         return false;
       }
