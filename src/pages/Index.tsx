@@ -1,8 +1,8 @@
-
 import React, { useMemo, useState } from "react";
 import NavigationBar from "@/components/NavigationBar";
 import { Card } from "@/components/ui/card";
-import { mockData } from "@/data/mockData";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { mockPaymentData } from "@/data/mockPaymentData";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { addDays, format, isWithinInterval, parseISO, subDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import ChartDisplay from "@/components/ChartDisplay";
+import PaymentSummaryTable from "@/components/PaymentSummaryTable";
+import PaymentMethodTable from "@/components/PaymentMethodTable";
+import PaymentGatewayTable from "@/components/PaymentGatewayTable";
 
 interface DateRange {
   from: Date;
@@ -47,9 +50,9 @@ const Index = () => {
 
   // Filter data based on selected criteria
   const filteredData = useMemo(() => {
-    return mockData.filter(item => {
+    return mockPaymentData.filter(item => {
       // Date range filtering
-      const paymentDate = new Date(item.date);
+      const paymentDate = parseISO(item.date);
       if (!isWithinInterval(paymentDate, { start: dateRange.from, end: dateRange.to })) {
         return false;
       }
@@ -115,6 +118,13 @@ const Index = () => {
       // EMI type filtering
       if (selectedEmiTypes.length > 0 && item.paymentMethod === "emi") {
         if (!selectedEmiTypes.includes(item.emiType)) {
+          return false;
+        }
+      }
+
+      // Card type filtering
+      if (selectedCardTypes.length > 0 && ["creditCard", "debitCard"].includes(item.paymentMethod)) {
+        if (!selectedCardTypes.includes(item.cardType)) {
           return false;
         }
       }
@@ -231,7 +241,7 @@ const Index = () => {
                     <h3 className="font-medium">Business Type</h3>
                     <Separator />
                     <div className="space-y-2">
-                      {["b2c", "b2b", "corporate"].map((type) => (
+                      {["B2B", "B2C", "D2C"].map((type) => (
                         <div key={type} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`business-${type}`} 
@@ -244,7 +254,7 @@ const Index = () => {
                               }
                             }}
                           />
-                          <Label htmlFor={`business-${type}`} className="capitalize">{type}</Label>
+                          <Label htmlFor={`business-${type}`}>{type}</Label>
                         </div>
                       ))}
                     </div>
@@ -266,7 +276,7 @@ const Index = () => {
                     <h3 className="font-medium">Line of Business</h3>
                     <Separator />
                     <div className="space-y-2">
-                      {["motor", "health", "life", "SME", "pet", "travel", "fire", "marine"].map((lob) => (
+                      {["Retail", "Wholesale", "Marketplace"].map((lob) => (
                         <div key={lob} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`lob-${lob}`} 
@@ -279,7 +289,7 @@ const Index = () => {
                               }
                             }}
                           />
-                          <Label htmlFor={`lob-${lob}`} className="capitalize">{lob}</Label>
+                          <Label htmlFor={`lob-${lob}`}>{lob}</Label>
                         </div>
                       ))}
                     </div>
@@ -441,10 +451,54 @@ const Index = () => {
                 </Popover>
               )}
               
+              {/* Card Type Filter - Only show when Credit Card or Debit Card is selected */}
+              {(selectedPaymentMethods.includes("creditCard") || 
+                selectedPaymentMethods.includes("debitCard") ||
+                selectedPaymentMethods.includes("cards")) && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <Filter className="h-4 w-4" />
+                      Card Type
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-4">
+                    <div className="space-y-2">
+                      <h3 className="font-medium">Card Type</h3>
+                      <Separator />
+                      <div className="space-y-2">
+                        {[
+                          { id: "visa", label: "Visa" },
+                          { id: "mastercard", label: "Mastercard" },
+                          { id: "rupay", label: "RuPay" },
+                          { id: "amex", label: "American Express" }
+                        ].map((cardType) => (
+                          <div key={cardType.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`card-${cardType.id}`} 
+                              checked={selectedCardTypes.includes(cardType.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedCardTypes([...selectedCardTypes, cardType.id]);
+                                } else {
+                                  setSelectedCardTypes(selectedCardTypes.filter(c => c !== cardType.id));
+                                }
+                              }}
+                            />
+                            <Label htmlFor={`card-${cardType.id}`}>{cardType.label}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+              
               {/* Display active filters as badges */}
               <div className="flex flex-wrap gap-2 mt-2">
                 {selectedBusinessTypes.map(type => (
-                  <Badge key={`badge-business-${type}`} variant="outline" className="bg-slate-100 capitalize">
+                  <Badge key={`badge-business-${type}`} variant="outline" className="bg-slate-100">
                     {type}
                     <button 
                       className="ml-1 text-slate-500 hover:text-slate-700"
@@ -456,7 +510,7 @@ const Index = () => {
                 ))}
                 
                 {selectedLOBs.map(lob => (
-                  <Badge key={`badge-lob-${lob}`} variant="outline" className="bg-slate-100 capitalize">
+                  <Badge key={`badge-lob-${lob}`} variant="outline" className="bg-slate-100">
                     {lob}
                     <button 
                       className="ml-1 text-slate-500 hover:text-slate-700"
@@ -528,6 +582,27 @@ const Index = () => {
                       <button 
                         className="ml-1 text-slate-500 hover:text-slate-700"
                         onClick={() => setSelectedEmiTypes(selectedEmiTypes.filter(e => e !== emiType))}
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  );
+                })}
+                
+                {selectedCardTypes.map(cardType => {
+                  const cardTypeLabels: Record<string, string> = {
+                    visa: "Visa",
+                    mastercard: "Mastercard",
+                    rupay: "RuPay",
+                    amex: "American Express"
+                  };
+                  
+                  return (
+                    <Badge key={`badge-card-${cardType}`} variant="outline" className="bg-slate-100">
+                      {cardTypeLabels[cardType] || cardType}
+                      <button 
+                        className="ml-1 text-slate-500 hover:text-slate-700"
+                        onClick={() => setSelectedCardTypes(selectedCardTypes.filter(c => c !== cardType))}
                       >
                         ×
                       </button>
@@ -626,6 +701,42 @@ const Index = () => {
             onRefresh={handleRefresh}
           />
         </div>
+        
+        {/* Detailed Analysis Tabs */}
+        <Card className="shadow-sm border-slate-200">
+          <Tabs defaultValue="summary" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="summary">Payment Summary</TabsTrigger>
+              <TabsTrigger 
+                value="method" 
+                onClick={() => setViewType("method")}
+                className={viewType === "method" ? "bg-slate-200" : ""}
+              >
+                By Payment Method
+              </TabsTrigger>
+              <TabsTrigger 
+                value="gateway" 
+                onClick={() => setViewType("gateway")}
+                className={viewType === "gateway" ? "bg-slate-200" : ""}
+              >
+                By Payment Gateway
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="summary" className="p-4">
+              <PaymentSummaryTable data={filteredData} />
+            </TabsContent>
+            <TabsContent value="method" className="p-4">
+              <PaymentMethodTable 
+                data={filteredData} 
+                emiTypes={selectedEmiTypes}
+                cardTypes={selectedCardTypes}
+              />
+            </TabsContent>
+            <TabsContent value="gateway" className="p-4">
+              <PaymentGatewayTable data={filteredData} />
+            </TabsContent>
+          </Tabs>
+        </Card>
       </div>
     </div>
   );
