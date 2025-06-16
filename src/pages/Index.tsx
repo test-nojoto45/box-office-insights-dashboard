@@ -1,964 +1,743 @@
-import { useEffect, useState } from "react";
-import { Download, ChevronDown, Plus, X, Filter, RefreshCw } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import NavigationBar from "@/components/NavigationBar";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { mockPaymentData } from "@/data/mockPaymentData";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { addDays, format, isWithinInterval, parseISO, subDays } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Input } from "@/components/ui/input";
-import { Calendar } from "@/components/ui/calendar";
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { mockData } from "@/data/mockData";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { ChevronDown, Filter, RefreshCw } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import ChartDisplay from "@/components/ChartDisplay";
-import BifurcationChart from "@/components/BifurcationChart";
+import PaymentSummaryTable from "@/components/PaymentSummaryTable";
+import PaymentMethodTable from "@/components/PaymentMethodTable";
+import PaymentGatewayTable from "@/components/PaymentGatewayTable";
 
-// Define type for the summary data
-interface PaymentSummary {
-  totalTransactions: number;
-  successCount: number;
-  failureCount: number;
-  refundCount: number;
-  totalVolume: number;
-  refundVolume: number;
-  policyCount: number;
-  emiType?: string;
-  paymentGateway?: string;
+interface DateRange {
+  from: Date;
+  to: Date;
 }
 
 const Index = () => {
-  // State for filters
-  const [dateRange, setDateRange] = useState({
-    from: new Date(2024, 4, 1),
-    to: new Date()
-  });
-  
-  // Single-select filters
-  const [businessType, setBusinessType] = useState<string | null>(null);
-  const [lob, setLob] = useState<string | null>(null);
-  const [insurer, setInsurer] = useState<string | null>(null);
-  
-  // Keep these as multi-select
-  const [paymentGateways, setPaymentGateways] = useState<string[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
-  const [emiTypes, setEmiTypes] = useState<string[]>([]);
-  const [cardTypes, setCardTypes] = useState<string[]>([]); // New card type filter
-  const [paymentStatuses, setPaymentStatuses] = useState<string[]>(["success"]);
-  
-  // State for view toggle
-  const [viewType, setViewType] = useState("gateway");
-  
-  // State for export fields
-  const [selectedExportFields, setSelectedExportFields] = useState({
-    leadId: true,
-    amount: true,
-    utr: true,
-    pg: true,
-    method: true,
-    status: true,
-    date: true,
-    lob: false,
+  // Date range state
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
   });
 
-  // Filtered data based on current filters
-  const [filteredData, setFilteredData] = useState(mockData);
+  // Filter states
+  const [selectedBusinessTypes, setSelectedBusinessTypes] = useState<string[]>([]);
+  const [selectedLOBs, setSelectedLOBs] = useState<string[]>([]);
+  const [selectedPaymentGateways, setSelectedPaymentGateways] = useState<string[]>([]);
+  const [selectedPaymentStatuses, setSelectedPaymentStatuses] = useState<string[]>(["success", "failure"]);
+  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>([]);
+  const [selectedEmiTypes, setSelectedEmiTypes] = useState<string[]>([]);
+  const [selectedCardTypes, setSelectedCardTypes] = useState<string[]>([]);
+  
+  // View type state (method or gateway)
+  const [viewType, setViewType] = useState<string>("method");
+  
+  // Refresh trigger
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
-  // Helper function to check if a value matches or is empty
-  const matchesOrEmpty = (selectedValue: string | null, itemValue: string) => {
-    return selectedValue === null || selectedValue === itemValue;
-  };
-
-  // Apply filters and update filtered data
-  useEffect(() => {
-    let filtered = [...mockData];
-    
-    // Apply each filter
-    filtered = filtered.filter(item => {
-      // First, handle shopse as a special EMI type
-      const shopseSelected = emiTypes.includes("shopse");
-      
-      // If shopse is selected, only apply LOB filter to shopse transactions
-      if (shopseSelected && item.emiType === "shopse") {
-        return matchesOrEmpty(businessType, item.businessType) &&
-               matchesOrEmpty(lob, item.lob) &&
-               matchesOrEmpty(insurer, item.insurer) &&
-               includesOrEmpty(paymentGateways, item.paymentGateway) &&
-               includesOrEmpty(paymentStatuses, item.status) &&
-               item.paymentMethod === "emi"; // Ensure payment method is "emi" for shopse
-      }
-      
-      // If shopse is selected but this item is not shopse, exclude it
-      if (shopseSelected && item.emiType !== "shopse") {
+  // Filter data based on selected criteria
+  const filteredData = useMemo(() => {
+    return mockPaymentData.filter(item => {
+      // Date range filtering
+      const paymentDate = parseISO(item.date);
+      if (!isWithinInterval(paymentDate, { start: dateRange.from, end: dateRange.to })) {
         return false;
       }
       
-      // Handle card type filtering
-      const cardTypeMatches = () => {
-        if (cardTypes.length === 0) return true;
-        if (item.paymentMethod === "creditCard" && cardTypes.includes("credit")) return true;
-        if (item.paymentMethod === "debitCard" && cardTypes.includes("debit")) return true;
+      // Business type filtering
+      if (selectedBusinessTypes.length > 0 && !selectedBusinessTypes.includes(item.businessType)) {
         return false;
-      };
+      }
       
-      // For non-shopse EMI types
-      const emiSelected = emiTypes.length > 0 && !shopseSelected;
-      const cardOrEmiSelected = paymentMethods.includes("cards") || paymentMethods.includes("emi");
-      const isEmiCompatible = !emiSelected || 
-        ((item.paymentMethod === "creditCard" || 
-          item.paymentMethod === "debitCard" ||
-          item.paymentMethod === "emi") && 
-          includesOrEmpty(emiTypes, item.emiType) && 
-          item.emiType !== "shopse");
+      // LOB filtering
+      if (selectedLOBs.length > 0 && !selectedLOBs.includes(item.lob)) {
+        return false;
+      }
       
-      // Handle payment method filtering with card combination
-      const paymentMethodMatches = () => {
-        if (paymentMethods.length === 0) return true;
+      // Payment gateway filtering
+      if (selectedPaymentGateways.length > 0 && !selectedPaymentGateways.includes(item.paymentGateway)) {
+        return false;
+      }
+      
+      // Payment status filtering
+      if (selectedPaymentStatuses.length > 0) {
+        if (item.isRefunded && selectedPaymentStatuses.includes("refund")) {
+          return true;
+        }
+        if (!selectedPaymentStatuses.includes(item.status)) {
+          return false;
+        }
+      }
+
+      // Payment method filtering with cards handling
+      if (selectedPaymentMethods.length > 0) {
+        const hasCardsFilter = selectedPaymentMethods.includes("cards");
+        const hasSpecificCardMethods = selectedPaymentMethods.some(method => 
+          ["creditCard", "debitCard"].includes(method)
+        );
         
-        if (paymentMethods.includes("cards")) {
-          if (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard") {
-            return cardTypeMatches();
+        if (hasCardsFilter && !hasSpecificCardMethods) {
+          // If only "cards" is selected, include both credit and debit cards
+          const isCardMethod = ["creditCard", "debitCard"].includes(item.paymentMethod);
+          const isOtherSelectedMethod = selectedPaymentMethods.filter(m => m !== "cards").includes(item.paymentMethod);
+          
+          if (!isCardMethod && !isOtherSelectedMethod) {
+            return false;
+          }
+        } else {
+          // Normal filtering
+          if (!selectedPaymentMethods.includes(item.paymentMethod) && !hasCardsFilter) {
+            return false;
+          }
+          
+          // If cards is selected along with specific methods, include both
+          if (hasCardsFilter && hasSpecificCardMethods) {
+            const isCardMethod = ["creditCard", "debitCard"].includes(item.paymentMethod);
+            const isSpecificMethod = selectedPaymentMethods.includes(item.paymentMethod);
+            
+            if (!isCardMethod && !isSpecificMethod) {
+              return false;
+            }
           }
         }
-        
-        return paymentMethods.includes(item.paymentMethod);
-      };
-      
-      // If EMI types (other than shopse) are selected but no card/emi payment methods are selected, 
-      // filter out non-compatible items
-      if (emiSelected && !cardOrEmiSelected && 
-          item.paymentMethod !== "creditCard" && 
-          item.paymentMethod !== "debitCard" &&
-          item.paymentMethod !== "emi") {
-        return false;
       }
-      
-      // Handle refund filter
-      if (paymentStatuses.includes("refund") && !paymentStatuses.includes(item.status)) {
-        return item.isRefunded; // Show refunded transactions regardless of their status
-      }
-      
-      return (
-        matchesOrEmpty(businessType, item.businessType) &&
-        matchesOrEmpty(lob, item.lob) &&
-        matchesOrEmpty(insurer, item.insurer) &&
-        includesOrEmpty(paymentGateways, item.paymentGateway) &&
-        paymentMethodMatches() &&
-        isEmiCompatible &&
-        (paymentStatuses.includes("refund") ? 
-          (item.isRefunded || includesOrEmpty(paymentStatuses, item.status)) :
-          includesOrEmpty(paymentStatuses, item.status))
-      );
-    });
 
-    // Apply date range filter
-    filtered = filtered.filter(item => {
-      const itemDate = new Date(item.date);
-      return itemDate >= dateRange.from && itemDate <= dateRange.to;
-    });
-    
-    setFilteredData(filtered);
-  }, [businessType, lob, insurer, paymentGateways, paymentMethods, emiTypes, cardTypes, paymentStatuses, dateRange]);
-
-  // Helper function to check if an array includes a value or is empty
-  const includesOrEmpty = (arr: string[], value: string) => {
-    return arr.length === 0 || arr.includes(value);
-  };
-
-  // Calculate metrics
-  const totalVolume = filteredData.reduce((sum, item) => sum + item.amount, 0);
-  const successCount = filteredData.filter(item => item.status === "success").length;
-  const failureCount = filteredData.filter(item => item.status === "failure").length;
-  const successPercentage = filteredData.length > 0 ? (successCount / filteredData.length) * 100 : 0;
-  const failurePercentage = filteredData.length > 0 ? (failureCount / filteredData.length) * 100 : 0;
-  
-  // Calculate policy count - assume each transaction represents a policy
-  const policyCount = filteredData.length;
-  
-  // Calculate refund metrics
-  const refundCount = filteredData.filter(item => item.isRefunded).length;
-  const refundVolume = filteredData.filter(item => item.isRefunded).reduce((sum, item) => sum + item.amount, 0);
-  const refundPercentage = filteredData.length > 0 ? (refundCount / filteredData.length) * 100 : 0;
-
-  // Format EMI type name for display
-  const formatEmiTypeName = (emiType: string) => {
-    switch (emiType) {
-      case "standard": return "Standard EMI";
-      case "noCost": return "No Cost EMI";
-      case "shopse": return "Shopse";
-      default: return "N/A";
-    }
-  };
-
-  // Format payment method name for display
-  const formatMethodName = (method: string) => {
-    switch (method) {
-      case "creditCard": return "Credit Card";
-      case "debitCard": return "Debit Card";
-      case "netBanking": return "Net Banking";
-      case "upi": return "UPI";
-      case "wallet": return "Wallet";
-      case "emi": return "EMI";
-      case "cards": return "Cards";
-      default: return method;
-    }
-  };
-
-  // Modified to include policy count in summary
-  const prepareMainSummaryData = () => {
-    const groupBy = viewType === "gateway" ? "paymentGateway" : "paymentMethod";
-    const summary: Record<string, PaymentSummary> = {};
-    
-    // First, group by the main dimension (gateway or method)
-    filteredData.forEach(item => {
-      const key = item[groupBy];
-      
-      if (!summary[key]) {
-        summary[key] = {
-          totalTransactions: 0,
-          successCount: 0,
-          failureCount: 0,
-          refundCount: 0,
-          totalVolume: 0,
-          refundVolume: 0,
-          policyCount: 0, // Initialize policy count
-          paymentGateway: viewType === "method" ? item.paymentGateway : undefined
-        };
-      }
-      
-      const summaryItem = summary[key];
-      summaryItem.totalTransactions += 1;
-      summaryItem.totalVolume += item.amount;
-      summaryItem.policyCount += 1; // Increment policy count
-      
-      if (item.status === "success") summaryItem.successCount += 1;
-      if (item.status === "failure") summaryItem.failureCount += 1;
-      if (item.isRefunded) {
-        summaryItem.refundCount += 1;
-        summaryItem.refundVolume += item.amount;
-      }
-    });
-    
-    return summary;
-  };
-
-  const prepareBifurcationSummaryData = () => {
-    if (emiTypes.length === 0 && cardTypes.length === 0) return {};
-    
-    const bifurcationSummary: Record<string, PaymentSummary> = {};
-    
-    filteredData.forEach(item => {
-      let bifurcationKey = "";
-      
-      // Create bifurcation key based on selected filters
-      if (emiTypes.length > 0 && item.emiType && emiTypes.includes(item.emiType)) {
-        bifurcationKey = `${item.paymentMethod}-${item.emiType}`;
-      } else if (cardTypes.length > 0 && 
-                ((item.paymentMethod === "creditCard" && cardTypes.includes("credit")) ||
-                 (item.paymentMethod === "debitCard" && cardTypes.includes("debit")))) {
-        const cardType = item.paymentMethod === "creditCard" ? "credit" : "debit";
-        bifurcationKey = `cards-${cardType}`;
-      }
-      
-      if (bifurcationKey) {
-        if (!bifurcationSummary[bifurcationKey]) {
-          bifurcationSummary[bifurcationKey] = {
-            totalTransactions: 0,
-            successCount: 0,
-            failureCount: 0,
-            refundCount: 0,
-            totalVolume: 0,
-            refundVolume: 0,
-            policyCount: 0,
-            emiType: emiTypes.length > 0 ? item.emiType : undefined,
-            paymentGateway: viewType === "method" ? item.paymentGateway : undefined
-          };
-        }
-        
-        const bifurcationItem = bifurcationSummary[bifurcationKey];
-        bifurcationItem.totalTransactions += 1;
-        bifurcationItem.totalVolume += item.amount;
-        bifurcationItem.policyCount += 1;
-        
-        if (item.status === "success") bifurcationItem.successCount += 1;
-        if (item.status === "failure") bifurcationItem.failureCount += 1;
-        if (item.isRefunded) {
-          bifurcationItem.refundCount += 1;
-          bifurcationItem.refundVolume += item.amount;
+      // EMI type filtering
+      if (selectedEmiTypes.length > 0 && item.paymentMethod === "emi") {
+        if (!selectedEmiTypes.includes(item.emiType)) {
+          return false;
         }
       }
-    });
-    
-    return bifurcationSummary;
-  };
-  
-  // Get summary data
-  const mainSummaryData = prepareMainSummaryData();
-  const bifurcationSummaryData = prepareBifurcationSummaryData();
 
-  // Helper function to handle EMI type selection
-  const handleEmiTypeToggle = (emiType: string) => {
-    if (emiType === "shopse" && !emiTypes.includes("shopse")) {
-      setEmiTypes(["shopse"]);
-      setPaymentMethods(["emi"]);
-      return;
-    }
-    
-    if (emiType !== "shopse" && emiTypes.includes("shopse")) {
-      const newEmiTypes = [emiType];
-      setEmiTypes(newEmiTypes);
-      
-      const hasCardOrEmiMethod = paymentMethods.includes("cards") || paymentMethods.includes("emi");
-      
-      if (!hasCardOrEmiMethod) {
-        setPaymentMethods(prev => [...prev, "cards"]);
-      }
-      
-      return;
-    }
-    
-    // Allow all EMI types to be selected when EMI method is selected
-    if (emiType !== "shopse" && paymentMethods.includes("emi")) {
-      handleCheckboxToggle(emiType, emiTypes, setEmiTypes);
-      return;
-    }
-    
-    if (emiType !== "shopse") {
-      const hasCardOrEmiMethod = paymentMethods.includes("cards") || paymentMethods.includes("emi");
-      
-      if (!hasCardOrEmiMethod && !emiTypes.includes(emiType)) {
-        setPaymentMethods(prev => [...prev, "cards"]);
-      }
-    }
-    
-    handleCheckboxToggle(emiType, emiTypes, setEmiTypes);
-  };
-
-  // Helper function to handle payment method toggle with shopse compatibility
-  const handlePaymentMethodToggle = (method: string) => {
-    if (emiTypes.includes("shopse")) {
-      if (method === "emi") {
-        if (paymentMethods.includes("emi")) {
-          return;
-        } else {
-          setPaymentMethods(["emi"]);
+      // Card type filtering
+      if (selectedCardTypes.length > 0 && ["creditCard", "debitCard"].includes(item.paymentMethod)) {
+        if (!selectedCardTypes.includes(item.cardType)) {
+          return false;
         }
-      } else {
-        return;
       }
-    } else {
-      handleCheckboxToggle(method, paymentMethods, setPaymentMethods);
-    }
-  };
 
-  // Reset filters function
-  const resetFilters = () => {
-    setBusinessType(null);
-    setLob(null);
-    setInsurer(null);
-    setPaymentGateways([]);
-    setPaymentMethods([]);
-    setEmiTypes([]);
-    setCardTypes([]);
-    setPaymentStatuses(["success"]);
-    setDateRange({
-      from: new Date(2024, 4, 1),
-      to: new Date()
+      return true;
     });
-    toast.success("Filters have been reset!");
+  }, [
+    dateRange,
+    selectedBusinessTypes,
+    selectedLOBs,
+    selectedPaymentGateways,
+    selectedPaymentStatuses,
+    selectedPaymentMethods,
+    selectedEmiTypes,
+    selectedCardTypes,
+    refreshTrigger
+  ]);
+
+  // Calculate summary metrics
+  const summary = useMemo(() => {
+    const totalTransactions = filteredData.length;
+    const totalVolume = filteredData.reduce((sum, item) => sum + item.amount, 0);
+    
+    const successfulTransactions = filteredData.filter(item => item.status === "success").length;
+    const successfulVolume = filteredData
+      .filter(item => item.status === "success")
+      .reduce((sum, item) => sum + item.amount, 0);
+    
+    const failedTransactions = filteredData.filter(item => item.status === "failure").length;
+    const failedVolume = filteredData
+      .filter(item => item.status === "failure")
+      .reduce((sum, item) => sum + item.amount, 0);
+    
+    const refundedTransactions = filteredData.filter(item => item.isRefunded).length;
+    const refundedVolume = filteredData
+      .filter(item => item.isRefunded)
+      .reduce((sum, item) => sum + item.amount, 0);
+    
+    return {
+      totalTransactions,
+      totalVolume,
+      successfulTransactions,
+      successfulVolume,
+      failedTransactions,
+      failedVolume,
+      refundedTransactions,
+      refundedVolume,
+      successRate: totalTransactions > 0 ? (successfulTransactions / totalTransactions) * 100 : 0
+    };
+  }, [filteredData]);
+
+  // Handle refresh button click
+  const handleRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
   };
 
-  // Helper functions
-  const handleExport = () => {
-    toast.success("Export initiated! File will be downloaded shortly.");
-  };
-
-  const formatCurrency = (amount) => {
+  // Helper function to format currency
+  const formatCurrency = (amount: number) => {
     if (amount >= 10000000) {
       return `₹${(amount / 10000000).toFixed(2)} Cr`;
     } else if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(2)} Lakhs`;
+      return `₹${(amount / 100000).toFixed(2)} L`;
     } else {
       return `₹${amount.toFixed(2)}`;
     }
   };
 
-  // Helper function for handling checkbox toggles in filter lists
-  const handleCheckboxToggle = (value: string, currentItems: string[], setItems: React.Dispatch<React.SetStateAction<string[]>>) => {
-    const updatedItems = currentItems.includes(value)
-      ? currentItems.filter(item => item !== value)
-      : [...currentItems, value];
-    setItems(updatedItems);
-  };
-
-  // Check if we should show failure details based on status filter
-  const showFailureDetails = paymentStatuses.length === 1 && paymentStatuses.includes("failure");
-  
-  // Check if we should show refund details based on status filter
-  const showRefundDetails = paymentStatuses.length === 1 && paymentStatuses.includes("refund");
-
-  // Check if we should show bifurcation chart
-  const showBifurcationChart = emiTypes.length > 0 || cardTypes.length > 0;
-
-  // Add refresh function
-  const handleRefresh = () => {
-    // This will re-fetch or re-process data while keeping current filters
-    setFilteredData([...filteredData]); // Force re-render by creating new array reference
-    toast.success("Charts refreshed successfully!");
+  // Helper function to format percentage
+  const formatPercentage = (value: number) => {
+    return `${value.toFixed(2)}%`;
   };
 
   return (
-    <div className="container max-w-7xl mx-auto py-6 space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Payment Analytics Dashboard</h1>
+    <div className="min-h-screen bg-slate-50">
+      <NavigationBar />
       
-      {/* Filters Section */}
-      <Card className="p-4">
-        <div className="flex flex-col space-y-4">
-          <div className="flex flex-wrap justify-end gap-4 items-end">
-            {/* Date Range */}
-            <div className="space-y-2">
-              <Label>Date Range</Label>
+      <div className="container mx-auto px-6 py-8 space-y-8">
+        {/* Filters Section */}
+        <Card className="p-6 shadow-sm border-slate-200">
+          <div className="flex flex-col space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-slate-800">Payment Analytics</h2>
+              
+              <div className="flex items-center space-x-4">
+                <DateRangePicker
+                  dateRange={dateRange}
+                  onDateRangeChange={setDateRange}
+                />
+                
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRefresh} 
+                  className="flex items-center gap-2 text-figma-blue-DEFAULT border-figma-blue-DEFAULT hover:bg-figma-blue-light/10"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              {/* Business Type Filter */}
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[240px]">
-                    {format(dateRange.from, "PP")} - {format(dateRange.to, "PP")}
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Business Type
+                    <ChevronDown className="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange.from}
-                    selected={{
-                      from: dateRange.from,
-                      to: dateRange.to,
-                    }}
-                    onSelect={(range) => {
-                      if (range?.from && range?.to) {
-                        setDateRange({ from: range.from, to: range.to });
-                      }
-                    }}
-                    numberOfMonths={2}
-                  />
+                <PopoverContent className="w-56 p-4">
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Business Type</h3>
+                    <Separator />
+                    <div className="space-y-2">
+                      {["B2B", "B2C", "D2C"].map((type) => (
+                        <div key={type} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`business-${type}`} 
+                            checked={selectedBusinessTypes.includes(type)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedBusinessTypes([...selectedBusinessTypes, type]);
+                              } else {
+                                setSelectedBusinessTypes(selectedBusinessTypes.filter(t => t !== type));
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`business-${type}`}>{type}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </PopoverContent>
               </Popover>
-            </div>
-
-            {/* Business Type Filter - Single Select */}
-            <div className="space-y-2">
-              <Label>Business Type</Label>
-              <Select value={businessType || undefined} onValueChange={setBusinessType}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="b2c">B2C</SelectItem>
-                  <SelectItem value="b2b">B2B</SelectItem>
-                  <SelectItem value="corporate">CORPORATE</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* LOB Filter - Single Select */}
-            <div className="space-y-2">
-              <Label>Line of Business</Label>
-              <Select value={lob || undefined} onValueChange={setLob}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="All LOBs" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All LOBs</SelectItem>
-                  <SelectItem value="motor">Motor</SelectItem>
-                  <SelectItem value="health">Health</SelectItem>
-                  <SelectItem value="life">Life</SelectItem>
-                  <SelectItem value="SME">SME</SelectItem>
-                  <SelectItem value="pet">Pet</SelectItem>
-                  <SelectItem value="travel">Travel</SelectItem>
-                  <SelectItem value="fire">Fire</SelectItem>
-                  <SelectItem value="marine">Marine</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* All Filters Button */}
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Filter className="h-4 w-4" /> All Filters
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Filter Options</DialogTitle>
-                  <DialogDescription>
-                    Select filters to refine your payment data
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-4">
-                  {/* Business Type - Single Select */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Business Type</Label>
-                    <Select value={businessType || undefined} onValueChange={setBusinessType}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Types" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="b2c">B2C</SelectItem>
-                        <SelectItem value="b2b">B2B</SelectItem>
-                        <SelectItem value="corporate">CORPORATE</SelectItem>
-                      </SelectContent>
-                    </Select>
+              
+              {/* LOB Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Line of Business
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-4">
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Line of Business</h3>
+                    <Separator />
+                    <div className="space-y-2">
+                      {["Retail", "Wholesale", "Marketplace"].map((lob) => (
+                        <div key={lob} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`lob-${lob}`} 
+                            checked={selectedLOBs.includes(lob)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedLOBs([...selectedLOBs, lob]);
+                              } else {
+                                setSelectedLOBs(selectedLOBs.filter(l => l !== lob));
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`lob-${lob}`}>{lob}</Label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  
-                  {/* LOB Filter - Single Select */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Line of Business</Label>
-                    <Select value={lob || undefined} onValueChange={setLob}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All LOBs" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All LOBs</SelectItem>
-                        <SelectItem value="motor">Motor</SelectItem>
-                        <SelectItem value="health">Health</SelectItem>
-                        <SelectItem value="life">Life</SelectItem>
-                        <SelectItem value="SME">SME</SelectItem>
-                        <SelectItem value="pet">Pet</SelectItem>
-                        <SelectItem value="travel">Travel</SelectItem>
-                        <SelectItem value="fire">Fire</SelectItem>
-                        <SelectItem value="marine">Marine</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {/* Payment Gateway - Still multi-select */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Payment Gateway</Label>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Payment Gateway Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Payment Gateway
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-4">
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Payment Gateway</h3>
+                    <Separator />
                     <div className="space-y-2">
                       {["Razorpay", "PayU"].map((gateway) => (
                         <div key={gateway} className="flex items-center space-x-2">
                           <Checkbox 
-                            id={`dialog-gateway-${gateway}`}
-                            checked={paymentGateways.includes(gateway)}
-                            onCheckedChange={() => handleCheckboxToggle(gateway, paymentGateways, setPaymentGateways)}
+                            id={`gateway-${gateway}`} 
+                            checked={selectedPaymentGateways.includes(gateway)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPaymentGateways([...selectedPaymentGateways, gateway]);
+                              } else {
+                                setSelectedPaymentGateways(selectedPaymentGateways.filter(g => g !== gateway));
+                              }
+                            }}
                           />
-                          <label htmlFor={`dialog-gateway-${gateway}`} className="text-sm leading-none cursor-pointer">
-                            {gateway}
-                          </label>
+                          <Label htmlFor={`gateway-${gateway}`}>{gateway}</Label>
                         </div>
                       ))}
                     </div>
                   </div>
-                  
-                  {/* Insurers - Single Select */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Insurer</Label>
-                    <Select value={insurer || undefined} onValueChange={setInsurer}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Insurers" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Insurers</SelectItem>
-                        <SelectItem value="Care">Care</SelectItem>
-                        <SelectItem value="ICICI">ICICI</SelectItem>
-                        <SelectItem value="Magma">Magma</SelectItem>
-                        <SelectItem value="Zuno">Zuno</SelectItem>
-                        <SelectItem value="HDFC">HDFC</SelectItem>
-                        <SelectItem value="Niva Bupa">Niva Bupa</SelectItem>
-                        <SelectItem value="SRGI">SRGI</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {/* Payment Method - Updated to combine cards */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Payment Method</Label>
+                </PopoverContent>
+              </Popover>
+              
+              {/* Payment Status Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Payment Status
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-4">
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Payment Status</h3>
+                    <Separator />
                     <div className="space-y-2">
-                      {["cards", "netBanking", "upi", "wallet", "emi"].map((method) => (
-                        <div key={method} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`dialog-method-${method}`}
-                            checked={paymentMethods.includes(method)}
-                            onCheckedChange={() => handlePaymentMethodToggle(method)}
-                            disabled={emiTypes.includes("shopse") && method !== "emi"}
-                          />
-                          <label htmlFor={`dialog-method-${method}`} className="text-sm leading-none cursor-pointer">
-                            {formatMethodName(method)}
-                          </label>
-                        </div>
-                      ))}
-                      {emiTypes.includes("shopse") && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Only EMI payment method allowed with Shopse
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Card Type Filter - Updated to enable when cards or EMI is selected */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Card Type</Label>
-                    <div className="space-y-2">
-                      {["credit", "debit"].map((cardType) => (
-                        <div key={cardType} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`dialog-cardtype-${cardType}`}
-                            checked={cardTypes.includes(cardType)}
-                            onCheckedChange={() => handleCheckboxToggle(cardType, cardTypes, setCardTypes)}
-                            disabled={!paymentMethods.includes("cards") && !paymentMethods.includes("emi")}
-                          />
-                          <label htmlFor={`dialog-cardtype-${cardType}`} className="text-sm leading-none cursor-pointer capitalize">
-                            {cardType} Card
-                          </label>
-                        </div>
-                      ))}
-                      {!paymentMethods.includes("cards") && !paymentMethods.includes("emi") && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Select "Cards" or "EMI" in Payment Method to enable card type filtering
-                        </p>
-                      )}
-                      {paymentMethods.includes("cards") && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Card type shows bifurcation for credit and debit cards
-                        </p>
-                      )}
-                      {paymentMethods.includes("emi") && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Card type applies to EMI transactions as well
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* EMI Type - Updated to allow all selections when EMI is selected */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">EMI Type</Label>
-                    <div className="space-y-2">
-                      {["standard", "noCost", "shopse"].map((emi) => (
-                        <div key={emi} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`dialog-emi-${emi}`}
-                            checked={emiTypes.includes(emi)}
-                            onCheckedChange={() => handleEmiTypeToggle(emi)}
-                            disabled={emi !== "shopse" && emiTypes.includes("shopse") ||
-                                     emi === "shopse" && emiTypes.length > 0 && !emiTypes.includes("shopse")}
-                          />
-                          <label htmlFor={`dialog-emi-${emi}`} className="text-sm leading-none cursor-pointer">
-                            {emi === "standard" ? "Standard" : emi === "noCost" ? "No Cost" : "Shopse"}
-                          </label>
-                        </div>
-                      ))}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {emiTypes.includes("shopse") ? 
-                          "Shopse requires EMI payment method" : 
-                          paymentMethods.includes("emi") ? 
-                          "All EMI types can be selected when EMI payment method is chosen" :
-                          "Standard/No Cost EMI types only apply to credit/debit cards and EMI method"}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Payment Status - Still multi-select with success as default selected */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Payment Status</Label>
-                    <div className="space-y-2">
-                      {["success", "failure", "pending", "refund"].map((status) => (
+                      {["success", "failure", "refund"].map((status) => (
                         <div key={status} className="flex items-center space-x-2">
                           <Checkbox 
-                            id={`dialog-status-${status}`}
-                            checked={paymentStatuses.includes(status)}
-                            onCheckedChange={() => handleCheckboxToggle(status, paymentStatuses, setPaymentStatuses)}
+                            id={`status-${status}`} 
+                            checked={selectedPaymentStatuses.includes(status)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPaymentStatuses([...selectedPaymentStatuses, status]);
+                              } else {
+                                setSelectedPaymentStatuses(selectedPaymentStatuses.filter(s => s !== status));
+                              }
+                            }}
                           />
-                          <label htmlFor={`dialog-status-${status}`} className="text-sm leading-none cursor-pointer capitalize">
-                            {status}
-                          </label>
+                          <Label htmlFor={`status-${status}`} className="capitalize">{status}</Label>
                         </div>
                       ))}
                     </div>
                   </div>
-                </div>
-                <div className="flex justify-end space-x-4 mt-4">
-                  <Button variant="outline" onClick={resetFilters}>
-                    Reset Filters
+                </PopoverContent>
+              </Popover>
+              
+              {/* Payment Method Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Payment Method
+                    <ChevronDown className="h-4 w-4" />
                   </Button>
-                  <DialogTrigger asChild>
-                    <Button>Apply Filters</Button>
-                  </DialogTrigger>
-                </div>
-              </DialogContent>
-            </Dialog>
-                
-            <Button 
-              variant="outline" 
-              onClick={resetFilters}
-            >
-              Reset Filters
-            </Button>
-            
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button className="flex items-center gap-2">
-                  <Download className="h-4 w-4" />
-                  Export
-                </Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>Export Data</SheetTitle>
-                  <SheetDescription>
-                    Select the fields you want to include in your export
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="py-6 space-y-4">
-                  <div className="grid grid-cols-1 gap-4">
-                    {Object.entries(selectedExportFields).map(([field, isSelected]) => (
-                      <div className="flex items-center space-x-2" key={field}>
-                        <Checkbox 
-                          id={field} 
-                          checked={isSelected}
-                          onCheckedChange={(checked) => 
-                            setSelectedExportFields(prev => ({
-                              ...prev,
-                              [field]: checked === true
-                            }))
-                          }
-                        />
-                        <label
-                          htmlFor={field}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          {field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}
-                        </label>
-                      </div>
-                    ))}
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-4">
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Payment Method</h3>
+                    <Separator />
+                    <div className="space-y-2">
+                      {[
+                        { id: "cards", label: "Cards" },
+                        { id: "creditCard", label: "Credit Card" },
+                        { id: "debitCard", label: "Debit Card" },
+                        { id: "netBanking", label: "Net Banking" },
+                        { id: "upi", label: "UPI" },
+                        { id: "wallet", label: "Wallet" },
+                        { id: "emi", label: "EMI" }
+                      ].map((method) => (
+                        <div key={method.id} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`method-${method.id}`} 
+                            checked={selectedPaymentMethods.includes(method.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPaymentMethods([...selectedPaymentMethods, method.id]);
+                              } else {
+                                setSelectedPaymentMethods(selectedPaymentMethods.filter(m => m !== method.id));
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`method-${method.id}`}>{method.label}</Label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <SheetFooter>
-                  <SheetClose asChild>
-                    <Button onClick={handleExport}>Download CSV</Button>
-                  </SheetClose>
-                </SheetFooter>
-              </SheetContent>
-            </Sheet>
-          </div>
-        </div>
-      </Card>
-      
-      {/* Metrics Section - Updated order and replaced refund volume with policy count */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Number of Policies</h3>
-            <p className="text-2xl font-bold">{policyCount}</p>
-            <p className="text-sm text-muted-foreground">Total policies processed</p>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Volume Processed</h3>
-            <p className="text-2xl font-bold">{formatCurrency(totalVolume)}</p>
-            <p className="text-sm text-muted-foreground">{filteredData.length} Transactions</p>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Success Percentage</h3>
-            <p className="text-2xl font-bold text-green-600">{successPercentage.toFixed(1)}%</p>
-            <p className="text-sm text-muted-foreground">{successCount} successful transactions</p>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground">Failure Percentage</h3>
-            <p className="text-2xl font-bold text-red-600">{failurePercentage.toFixed(1)}%</p>
-            <p className="text-sm text-muted-foreground">{failureCount} failed transactions</p>
-          </div>
-        </Card>
-      </div>
-      
-      {/* Chart Section - Updated to pass the refresh handler */}
-      <Tabs defaultValue="gateway" onValueChange={setViewType}>
-        <TabsList className="w-[400px] mb-4">
-          <TabsTrigger value="gateway">Payment Gateway</TabsTrigger>
-          <TabsTrigger value="method">Payment Method</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="gateway">
-          <ChartDisplay 
-            data={filteredData} 
-            viewType="gateway" 
-            paymentStatuses={paymentStatuses}
-            emiTypes={emiTypes}
-            paymentMethods={paymentMethods}
-            onRefresh={handleRefresh}
-          />
-        </TabsContent>
-        
-        <TabsContent value="method">
-          <ChartDisplay 
-            data={filteredData} 
-            viewType="method" 
-            paymentStatuses={paymentStatuses}
-            emiTypes={emiTypes}
-            paymentMethods={paymentMethods}
-            onRefresh={handleRefresh}
-          />
-        </TabsContent>
-      </Tabs>
-
-      {/* Bifurcation Chart - New section */}
-      {showBifurcationChart && (
-        <BifurcationChart 
-          data={filteredData}
-          emiTypes={emiTypes}
-          cardTypes={cardTypes}
-          paymentMethods={paymentMethods}
-          onRefresh={handleRefresh}
-        />
-      )}
-      
-      {/* Main Summary Table */}
-      <Card className="p-4">
-        <h2 className="text-xl font-bold mb-4">
-          {viewType === "gateway" ? "Payment Gateway Summary" : "Payment Method Summary"}
-        </h2>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{viewType === "gateway" ? "Payment Gateway" : "Payment Method"}</TableHead>
-                <TableHead>Total Transactions</TableHead>
-                <TableHead>Total Volume</TableHead>
-                {showRefundDetails ? (
-                  <TableHead>Refund Count</TableHead>
-                ) : (!showFailureDetails && (
-                  <>
-                    <TableHead>Success%</TableHead>
-                    <TableHead>Failure%</TableHead>
-                  </>
+                </PopoverContent>
+              </Popover>
+              
+              {/* EMI Type Filter - Only show when EMI is selected */}
+              {selectedPaymentMethods.includes("emi") && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <Filter className="h-4 w-4" />
+                      EMI Type
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-4">
+                    <div className="space-y-2">
+                      <h3 className="font-medium">EMI Type</h3>
+                      <Separator />
+                      <div className="space-y-2">
+                        {[
+                          { id: "standard", label: "Standard EMI" },
+                          { id: "noCost", label: "No Cost EMI" },
+                          { id: "shopse", label: "Shopse" }
+                        ].map((emiType) => (
+                          <div key={emiType.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`emi-${emiType.id}`} 
+                              checked={selectedEmiTypes.includes(emiType.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedEmiTypes([...selectedEmiTypes, emiType.id]);
+                                } else {
+                                  setSelectedEmiTypes(selectedEmiTypes.filter(e => e !== emiType.id));
+                                }
+                              }}
+                            />
+                            <Label htmlFor={`emi-${emiType.id}`}>{emiType.label}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+              
+              {/* Card Type Filter - Only show when Credit Card or Debit Card is selected */}
+              {(selectedPaymentMethods.includes("creditCard") || 
+                selectedPaymentMethods.includes("debitCard") ||
+                selectedPaymentMethods.includes("cards")) && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <Filter className="h-4 w-4" />
+                      Card Type
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-4">
+                    <div className="space-y-2">
+                      <h3 className="font-medium">Card Type</h3>
+                      <Separator />
+                      <div className="space-y-2">
+                        {[
+                          { id: "visa", label: "Visa" },
+                          { id: "mastercard", label: "Mastercard" },
+                          { id: "rupay", label: "RuPay" },
+                          { id: "amex", label: "American Express" }
+                        ].map((cardType) => (
+                          <div key={cardType.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`card-${cardType.id}`} 
+                              checked={selectedCardTypes.includes(cardType.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedCardTypes([...selectedCardTypes, cardType.id]);
+                                } else {
+                                  setSelectedCardTypes(selectedCardTypes.filter(c => c !== cardType.id));
+                                }
+                              }}
+                            />
+                            <Label htmlFor={`card-${cardType.id}`}>{cardType.label}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+              
+              {/* Display active filters as badges */}
+              <div className="flex flex-wrap gap-2 mt-2">
+                {selectedBusinessTypes.map(type => (
+                  <Badge key={`badge-business-${type}`} variant="outline" className="bg-slate-100">
+                    {type}
+                    <button 
+                      className="ml-1 text-slate-500 hover:text-slate-700"
+                      onClick={() => setSelectedBusinessTypes(selectedBusinessTypes.filter(t => t !== type))}
+                    >
+                      ×
+                    </button>
+                  </Badge>
                 ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Object.entries(mainSummaryData).map(([key, data]) => (
-                <TableRow key={key}>
-                  <TableCell className="font-medium">
-                    {formatMethodName(key)}
-                  </TableCell>
-                  <TableCell>{data.totalTransactions}</TableCell>
-                  <TableCell>{formatCurrency(data.totalVolume)}</TableCell>
-                  {showRefundDetails ? (
-                    <TableCell>{data.refundCount}</TableCell>
-                  ) : (!showFailureDetails && (
-                    <>
-                      <TableCell>
-                        {data.totalTransactions > 0 
-                          ? ((data.successCount / data.totalTransactions) * 100).toFixed(1) 
-                          : 0}%
-                      </TableCell>
-                      <TableCell>
-                        {data.totalTransactions > 0 
-                          ? ((data.failureCount / data.totalTransactions) * 100).toFixed(1) 
-                          : 0}%
-                      </TableCell>
-                    </>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
-
-      {/* Bifurcation Summary Table */}
-      {Object.keys(bifurcationSummaryData).length > 0 && (
-        <Card className="p-4">
-          <h2 className="text-xl font-bold mb-4">
-            {emiTypes.length > 0 && cardTypes.length > 0 
-              ? "EMI Type & Card Type Summary" 
-              : emiTypes.length > 0 
-                ? "EMI Type Summary" 
-                : "Card Type Summary"}
-          </h2>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  {viewType === "method" && showFailureDetails && (
-                    <TableHead>Payment Gateway</TableHead>
-                  )}
-                  <TableHead>Total Transactions</TableHead>
-                  <TableHead>Total Volume</TableHead>
-                  {showRefundDetails ? (
-                    <TableHead>Refund Count</TableHead>
-                  ) : (!showFailureDetails && (
-                    <>
-                      <TableHead>Success%</TableHead>
-                      <TableHead>Failure%</TableHead>
-                    </>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Object.entries(bifurcationSummaryData).map(([key, data]) => {
-                  const typeDetail = key.split('-')[1];
-                  const formatTypeDetail = (type: string) => {
-                    if (emiTypes.length > 0) {
-                      return formatEmiTypeName(type);
-                    } else if (cardTypes.length > 0) {
-                      return type === "credit" ? "Credit Card" : "Debit Card";
-                    }
-                    return type;
+                
+                {selectedLOBs.map(lob => (
+                  <Badge key={`badge-lob-${lob}`} variant="outline" className="bg-slate-100">
+                    {lob}
+                    <button 
+                      className="ml-1 text-slate-500 hover:text-slate-700"
+                      onClick={() => setSelectedLOBs(selectedLOBs.filter(l => l !== lob))}
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+                
+                {selectedPaymentGateways.map(gateway => (
+                  <Badge key={`badge-gateway-${gateway}`} variant="outline" className="bg-slate-100">
+                    {gateway}
+                    <button 
+                      className="ml-1 text-slate-500 hover:text-slate-700"
+                      onClick={() => setSelectedPaymentGateways(selectedPaymentGateways.filter(g => g !== gateway))}
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+                
+                {selectedPaymentStatuses.map(status => (
+                  <Badge key={`badge-status-${status}`} variant="outline" className="bg-slate-100 capitalize">
+                    {status}
+                    <button 
+                      className="ml-1 text-slate-500 hover:text-slate-700"
+                      onClick={() => setSelectedPaymentStatuses(selectedPaymentStatuses.filter(s => s !== status))}
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+                
+                {selectedPaymentMethods.map(method => {
+                  const methodLabels: Record<string, string> = {
+                    creditCard: "Credit Card",
+                    debitCard: "Debit Card",
+                    netBanking: "Net Banking",
+                    upi: "UPI",
+                    wallet: "Wallet",
+                    emi: "EMI",
+                    cards: "Cards"
                   };
                   
                   return (
-                    <TableRow key={key}>
-                      <TableCell className="font-medium">
-                        {formatTypeDetail(typeDetail)}
-                      </TableCell>
-                      {viewType === "method" && showFailureDetails && (
-                        <TableCell>
-                          {data.paymentGateway || "N/A"}
-                        </TableCell>
-                      )}
-                      <TableCell>{data.totalTransactions}</TableCell>
-                      <TableCell>{formatCurrency(data.totalVolume)}</TableCell>
-                      {showRefundDetails ? (
-                        <TableCell>{data.refundCount}</TableCell>
-                      ) : (!showFailureDetails && (
-                        <>
-                          <TableCell>
-                            {data.totalTransactions > 0 
-                              ? ((data.successCount / data.totalTransactions) * 100).toFixed(1) 
-                              : 0}%
-                          </TableCell>
-                          <TableCell>
-                            {data.totalTransactions > 0 
-                              ? ((data.failureCount / data.totalTransactions) * 100).toFixed(1) 
-                              : 0}%
-                          </TableCell>
-                        </>
-                      ))}
-                    </TableRow>
+                    <Badge key={`badge-method-${method}`} variant="outline" className="bg-slate-100">
+                      {methodLabels[method] || method}
+                      <button 
+                        className="ml-1 text-slate-500 hover:text-slate-700"
+                        onClick={() => setSelectedPaymentMethods(selectedPaymentMethods.filter(m => m !== method))}
+                      >
+                        ×
+                      </button>
+                    </Badge>
                   );
                 })}
-              </TableBody>
-            </Table>
+                
+                {selectedEmiTypes.map(emiType => {
+                  const emiTypeLabels: Record<string, string> = {
+                    standard: "Standard EMI",
+                    noCost: "No Cost EMI",
+                    shopse: "Shopse"
+                  };
+                  
+                  return (
+                    <Badge key={`badge-emi-${emiType}`} variant="outline" className="bg-slate-100">
+                      {emiTypeLabels[emiType] || emiType}
+                      <button 
+                        className="ml-1 text-slate-500 hover:text-slate-700"
+                        onClick={() => setSelectedEmiTypes(selectedEmiTypes.filter(e => e !== emiType))}
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  );
+                })}
+                
+                {selectedCardTypes.map(cardType => {
+                  const cardTypeLabels: Record<string, string> = {
+                    visa: "Visa",
+                    mastercard: "Mastercard",
+                    rupay: "RuPay",
+                    amex: "American Express"
+                  };
+                  
+                  return (
+                    <Badge key={`badge-card-${cardType}`} variant="outline" className="bg-slate-100">
+                      {cardTypeLabels[cardType] || cardType}
+                      <button 
+                        className="ml-1 text-slate-500 hover:text-slate-700"
+                        onClick={() => setSelectedCardTypes(selectedCardTypes.filter(c => c !== cardType))}
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  );
+                })}
+                
+                {/* Clear all filters button */}
+                {(selectedBusinessTypes.length > 0 || 
+                  selectedLOBs.length > 0 || 
+                  selectedPaymentGateways.length > 0 || 
+                  selectedPaymentStatuses.length > 0 || 
+                  selectedPaymentMethods.length > 0 ||
+                  selectedEmiTypes.length > 0 ||
+                  selectedCardTypes.length > 0) && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => {
+                      setSelectedBusinessTypes([]);
+                      setSelectedLOBs([]);
+                      setSelectedPaymentGateways([]);
+                      setSelectedPaymentStatuses(["success", "failure"]);
+                      setSelectedPaymentMethods([]);
+                      setSelectedEmiTypes([]);
+                      setSelectedCardTypes([]);
+                    }}
+                    className="text-slate-500 hover:text-slate-700"
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </Card>
-      )}
+        
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-4 shadow-sm border-slate-200">
+            <div className="space-y-1">
+              <p className="text-sm text-slate-500">Total Volume</p>
+              <p className="text-2xl font-semibold">{formatCurrency(summary.totalVolume)}</p>
+              <p className="text-sm text-slate-500">{summary.totalTransactions} Transactions</p>
+            </div>
+          </Card>
+          
+          <Card className="p-4 shadow-sm border-slate-200">
+            <div className="space-y-1">
+              <p className="text-sm text-slate-500">Successful Volume</p>
+              <p className="text-2xl font-semibold text-emerald-600">{formatCurrency(summary.successfulVolume)}</p>
+              <div className="flex justify-between">
+                <p className="text-sm text-slate-500">{summary.successfulTransactions} Transactions</p>
+                <p className="text-sm font-medium text-emerald-600">{formatPercentage(summary.successRate)}</p>
+              </div>
+            </div>
+          </Card>
+          
+          <Card className="p-4 shadow-sm border-slate-200">
+            <div className="space-y-1">
+              <p className="text-sm text-slate-500">Failed Volume</p>
+              <p className="text-2xl font-semibold text-red-600">{formatCurrency(summary.failedVolume)}</p>
+              <div className="flex justify-between">
+                <p className="text-sm text-slate-500">{summary.failedTransactions} Transactions</p>
+                <p className="text-sm font-medium text-red-600">
+                  {formatPercentage(summary.totalTransactions > 0 ? (summary.failedTransactions / summary.totalTransactions) * 100 : 0)}
+                </p>
+              </div>
+            </div>
+          </Card>
+          
+          <Card className="p-4 shadow-sm border-slate-200">
+            <div className="space-y-1">
+              <p className="text-sm text-slate-500">Refunded Volume</p>
+              <p className="text-2xl font-semibold text-amber-600">{formatCurrency(summary.refundedVolume)}</p>
+              <div className="flex justify-between">
+                <p className="text-sm text-slate-500">{summary.refundedTransactions} Transactions</p>
+                <p className="text-sm font-medium text-amber-600">
+                  {formatPercentage(summary.totalTransactions > 0 ? (summary.refundedTransactions / summary.totalTransactions) * 100 : 0)}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 gap-8">
+          {/* Main Chart */}
+          <ChartDisplay 
+            data={filteredData}
+            viewType={viewType}
+            paymentStatuses={selectedPaymentStatuses}
+            emiTypes={selectedEmiTypes}
+            paymentMethods={selectedPaymentMethods}
+            cardTypes={selectedCardTypes}
+            onRefresh={handleRefresh}
+          />
+        </div>
+        
+        {/* Detailed Analysis Tabs */}
+        <Card className="shadow-sm border-slate-200">
+          <Tabs defaultValue="summary" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="summary">Payment Summary</TabsTrigger>
+              <TabsTrigger 
+                value="method" 
+                onClick={() => setViewType("method")}
+                className={viewType === "method" ? "bg-slate-200" : ""}
+              >
+                By Payment Method
+              </TabsTrigger>
+              <TabsTrigger 
+                value="gateway" 
+                onClick={() => setViewType("gateway")}
+                className={viewType === "gateway" ? "bg-slate-200" : ""}
+              >
+                By Payment Gateway
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="summary" className="p-4">
+              <PaymentSummaryTable data={filteredData} />
+            </TabsContent>
+            <TabsContent value="method" className="p-4">
+              <PaymentMethodTable 
+                data={filteredData} 
+                emiTypes={selectedEmiTypes}
+                cardTypes={selectedCardTypes}
+              />
+            </TabsContent>
+            <TabsContent value="gateway" className="p-4">
+              <PaymentGatewayTable data={filteredData} />
+            </TabsContent>
+          </Tabs>
+        </Card>
+      </div>
     </div>
   );
 };
