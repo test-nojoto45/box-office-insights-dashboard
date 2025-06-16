@@ -11,7 +11,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
-import PaymentStackedBarChart from "@/components/PaymentStackedBarChart";
+import PaymentLineChart from "@/components/PaymentLineChart";
 import PaymentPieChart from "@/components/PaymentPieChart";
 
 interface ChartDisplayProps {
@@ -20,7 +20,6 @@ interface ChartDisplayProps {
   paymentStatuses: string[];
   emiTypes: string[];
   paymentMethods: string[];
-  cardTypes: string[];
   onRefresh?: () => void;
 }
 
@@ -30,7 +29,6 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
   paymentStatuses, 
   emiTypes,
   paymentMethods,
-  cardTypes,
   onRefresh 
 }) => {
   // State for y-axis metric
@@ -79,14 +77,12 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
           </div>
           
           <div className="h-[400px] w-full">
-            <PaymentStackedBarChart 
+            <PaymentLineChart 
               data={data} 
               viewType={viewType} 
               yAxisMetric={yAxisMetric}
               paymentStatuses={paymentStatuses}
               paymentMethods={paymentMethods}
-              emiTypes={emiTypes}
-              cardTypes={cardTypes}
             />
           </div>
         </Card>
@@ -134,14 +130,12 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
       </div>
       
       <div className="h-[400px] w-full">
-        <PaymentStackedBarChart 
+        <PaymentLineChart 
           data={data} 
           viewType={viewType} 
           yAxisMetric={yAxisMetric}
           paymentStatuses={paymentStatuses}
           paymentMethods={paymentMethods}
-          emiTypes={emiTypes}
-          cardTypes={cardTypes}
         />
       </div>
     </Card>
