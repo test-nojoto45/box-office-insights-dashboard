@@ -33,8 +33,18 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
   // State for drill-down functionality
   const [drillDownMethod, setDrillDownMethod] = useState<string | null>(null);
 
+  // Debug logging
+  console.log("PaymentStackedBarChart props:", { data: data?.length, viewType, yAxisMetric, paymentStatuses, paymentMethods });
+
   // Prepare the data for the stacked bar chart
   const chartData = useMemo(() => {
+    console.log("Processing chart data, input data length:", data?.length);
+    
+    if (!data || data.length === 0) {
+      console.log("No data available");
+      return [];
+    }
+
     // Group data by date
     const dateGroups = data.reduce((acc, item) => {
       const date = new Date(item.date);
@@ -59,20 +69,20 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
       }
       
       // Increment totals
-      acc[dateStr].totalAmount += item.amount;
+      acc[dateStr].totalAmount += item.amount || 0;
       acc[dateStr].totalCount += 1;
       
       // Status-specific tracking
       if (item.status === "success") {
-        acc[dateStr].successAmount += item.amount;
+        acc[dateStr].successAmount += item.amount || 0;
         acc[dateStr].successCount += 1;
       } else if (item.status === "failure") {
-        acc[dateStr].failureAmount += item.amount;
+        acc[dateStr].failureAmount += item.amount || 0;
         acc[dateStr].failureCount += 1;
       }
       
       if (item.isRefunded) {
-        acc[dateStr].refundAmount += item.amount;
+        acc[dateStr].refundAmount += item.amount || 0;
         acc[dateStr].refundCount += 1;
       }
       
@@ -84,7 +94,7 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
           if (!acc[dateStr].cardTypeData[cardType]) {
             acc[dateStr].cardTypeData[cardType] = { amount: 0, count: 0 };
           }
-          acc[dateStr].cardTypeData[cardType].amount += item.amount;
+          acc[dateStr].cardTypeData[cardType].amount += item.amount || 0;
           acc[dateStr].cardTypeData[cardType].count += 1;
         } else if (drillDownMethod === "emi" && item.paymentMethod === "emi") {
           // Drill-down for EMI types
@@ -92,35 +102,37 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
           if (!acc[dateStr].emiTypeData[emiType]) {
             acc[dateStr].emiTypeData[emiType] = { amount: 0, count: 0 };
           }
-          acc[dateStr].emiTypeData[emiType].amount += item.amount;
+          acc[dateStr].emiTypeData[emiType].amount += item.amount || 0;
           acc[dateStr].emiTypeData[emiType].count += 1;
         } else if (!drillDownMethod) {
           // Normal method view
           let method = item.paymentMethod;
-          if (paymentMethods.includes("cards") && (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard")) {
+          if ((item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard")) {
             method = "cards";
           }
           
           if (!acc[dateStr].methodData[method]) {
             acc[dateStr].methodData[method] = { amount: 0, count: 0 };
           }
-          acc[dateStr].methodData[method].amount += item.amount;
+          acc[dateStr].methodData[method].amount += item.amount || 0;
           acc[dateStr].methodData[method].count += 1;
         }
       } else if (viewType === "gateway") {
         const gateway = item.paymentGateway;
-        if (!acc[dateStr].gatewayData[gateway]) {
+        if (gateway && !acc[dateStr].gatewayData[gateway]) {
           acc[dateStr].gatewayData[gateway] = { amount: 0, count: 0 };
         }
-        acc[dateStr].gatewayData[gateway].amount += item.amount;
-        acc[dateStr].gatewayData[gateway].count += 1;
+        if (gateway) {
+          acc[dateStr].gatewayData[gateway].amount += item.amount || 0;
+          acc[dateStr].gatewayData[gateway].count += 1;
+        }
       }
       
       return acc;
     }, {});
     
     // Convert to array and process data
-    return Object.values(dateGroups)
+    const processedData = Object.values(dateGroups)
       .map((group: any) => {
         const processedGroup = { ...group };
         
@@ -190,14 +202,27 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
         return processedGroup;
       })
       .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    console.log("Processed chart data:", processedData);
+    return processedData;
   }, [data, viewType, paymentMethods, drillDownMethod]);
 
   // Empty state check
+  if (!data || data.length === 0) {
+    return (
+      <Card className="p-4">
+        <div className="text-center py-8">
+          <p>No data available</p>
+        </div>
+      </Card>
+    );
+  }
+
   if (chartData.length === 0) {
     return (
       <Card className="p-4">
         <div className="text-center py-8">
-          <p>No data available for the selected filters</p>
+          <p>No chart data could be processed from the available data</p>
         </div>
       </Card>
     );
@@ -242,12 +267,14 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
 
   // Handle bar click for drill-down
   const handleBarClick = (data: any, index: number) => {
+    console.log("Bar clicked:", data, index);
     if (viewType === "method" && !drillDownMethod) {
       // Check if clicked bar is cards or emi
       const clickedMethod = Object.keys(data).find(key => 
         key.endsWith('VolumePercent') || key.endsWith('Count')
       )?.replace('VolumePercent', '').replace('Count', '');
       
+      console.log("Clicked method:", clickedMethod);
       if (clickedMethod === 'cards' || clickedMethod === 'emi') {
         setDrillDownMethod(clickedMethod);
       }
@@ -279,9 +306,7 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
         }
       } else if (drillDownMethod === "emi") {
         // Show EMI sub-types
-        const emiTypes = Array.from(
-          new Set(data.filter(item => item.emiType).map(item => item.emiType))
-        );
+        const emiTypes = ["standard", "noCost", "shopse"];
         if (yAxisMetric === "percentVolume") {
           return emiTypes.map(type => ({
             id: type,
@@ -300,30 +325,20 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
           }));
         }
       } else {
-        // Normal method view
-        let paymentMethodsToShow = Array.from(
+        // Normal method view - get all unique payment methods from data
+        const allMethods = Array.from(
           new Set(data.map(item => {
-            if (paymentMethods.includes("cards") && (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard")) {
+            if (item.paymentMethod === "creditCard" || item.paymentMethod === "debitCard") {
               return "cards";
             }
             return item.paymentMethod;
           }))
         );
         
-        if (paymentMethods.length > 0) {
-          const expandedMethods = [];
-          for (const method of paymentMethods) {
-            if (method === "cards") {
-              expandedMethods.push("cards");
-            } else {
-              expandedMethods.push(method);
-            }
-          }
-          paymentMethodsToShow = paymentMethodsToShow.filter(method => expandedMethods.includes(method));
-        }
+        console.log("All methods found:", allMethods);
         
         if (yAxisMetric === "percentVolume") {
-          return paymentMethodsToShow.map(method => ({
+          return allMethods.map(method => ({
             id: method,
             dataKey: `${method}VolumePercent`,
             fill: colors[method] || "#666",
@@ -331,7 +346,7 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
             visible: true
           }));
         } else {
-          return paymentMethodsToShow.map(method => ({
+          return allMethods.map(method => ({
             id: method,
             dataKey: `${method}Count`,
             fill: colors[method] || "#666",
@@ -344,7 +359,7 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
     // Gateway view
     else if (viewType === "gateway") {
       const gateways = Array.from(
-        new Set(data.map(item => item.paymentGateway))
+        new Set(data.map(item => item.paymentGateway).filter(Boolean))
       );
       
       if (yAxisMetric === "percentVolume") {
@@ -365,6 +380,7 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
         }));
       }
     }
+    // Status view
     else {
       switch (yAxisMetric) {
         case "percentVolume":
@@ -424,6 +440,7 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
   };
 
   const barsToShow = getBarsToShow();
+  console.log("Bars to show:", barsToShow);
 
   // Determine y-axis configuration based on selected metric
   const getYAxisConfig = () => {
