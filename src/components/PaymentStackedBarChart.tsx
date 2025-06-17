@@ -35,15 +35,26 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
   const [drillDownMethod, setDrillDownMethod] = useState<string | null>(null);
 
   // Debug logging
-  console.log("PaymentStackedBarChart props:", { data: data?.length, viewType, yAxisMetric, paymentStatuses, paymentMethods });
+  console.log("PaymentStackedBarChart received data:", data);
+  console.log("PaymentStackedBarChart props:", { 
+    dataLength: data?.length, 
+    viewType, 
+    yAxisMetric, 
+    paymentStatuses, 
+    paymentMethods 
+  });
 
   // Prepare the data for the stacked bar chart
   const chartData = useMemo(() => {
-    return processChartData(data, viewType, drillDownMethod);
+    console.log("Processing chart data with:", { data: data?.length, viewType, drillDownMethod });
+    const processed = processChartData(data, viewType, drillDownMethod);
+    console.log("Processed chart data result:", processed);
+    return processed;
   }, [data, viewType, drillDownMethod]);
 
   // Empty state check
   if (!data || data.length === 0) {
+    console.log("No data available for chart");
     return (
       <Card className="p-4">
         <div className="text-center py-8">
@@ -54,10 +65,14 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
   }
 
   if (chartData.length === 0) {
+    console.log("No chart data could be processed");
     return (
       <Card className="p-4">
         <div className="text-center py-8">
           <p>No chart data could be processed from the available data</p>
+          <p className="text-sm text-gray-500 mt-2">
+            Raw data length: {data.length}, View type: {viewType}
+          </p>
         </div>
       </Card>
     );
@@ -84,6 +99,21 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
 
   const yAxisConfig = getYAxisConfig(yAxisMetric);
 
+  // Add validation for bars
+  if (!barsToShow || barsToShow.length === 0) {
+    console.log("No bars to show");
+    return (
+      <Card className="p-4">
+        <div className="text-center py-8">
+          <p>No bars configured for display</p>
+          <p className="text-sm text-gray-500 mt-2">
+            View type: {viewType}, Drill down: {drillDownMethod || 'none'}
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <DrillDownControls 
@@ -91,7 +121,7 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
         onBack={() => setDrillDownMethod(null)}
       />
 
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height={400}>
         <BarChart
           data={chartData}
           margin={{
@@ -105,7 +135,14 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
           <XAxis 
             dataKey="date" 
-            tickFormatter={(tick) => format(new Date(tick), "MMM dd")}
+            tickFormatter={(tick) => {
+              try {
+                return format(new Date(tick), "MMM dd");
+              } catch (e) {
+                console.error("Date formatting error:", e, tick);
+                return tick;
+              }
+            }}
             stroke="#64748b"
             fontSize={12}
           />
@@ -122,7 +159,14 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
           />
           <Tooltip 
             formatter={yAxisConfig.tooltipFormatter}
-            labelFormatter={(label) => format(new Date(label), "MMM dd, yyyy")}
+            labelFormatter={(label) => {
+              try {
+                return format(new Date(label), "MMM dd, yyyy");
+              } catch (e) {
+                console.error("Tooltip date formatting error:", e, label);
+                return label;
+              }
+            }}
             contentStyle={{
               backgroundColor: 'white',
               border: '1px solid #e2e8f0',
@@ -142,7 +186,11 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
               stackId="a"
               fill={bar.fill}
               name={bar.name}
-              style={{ cursor: viewType === "method" && !drillDownMethod && (bar.id === "cards" || bar.id === "emi") ? "pointer" : "default" }}
+              style={{ 
+                cursor: viewType === "method" && !drillDownMethod && (bar.id === "cards" || bar.id === "emi") 
+                  ? "pointer" 
+                  : "default" 
+              }}
             />
           ))}
         </BarChart>

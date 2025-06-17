@@ -23,15 +23,24 @@ export const processChartData = (
   viewType: string,
   drillDownMethod: string | null
 ): ChartDataItem[] => {
-  console.log("Processing chart data, input data length:", data?.length);
+  console.log("Processing chart data, input data:", data);
+  console.log("Processing chart data, input params:", { viewType, drillDownMethod });
   
   if (!data || data.length === 0) {
-    console.log("No data available");
+    console.log("No data available for processing");
     return [];
   }
 
+  // Sample the first few items to understand data structure
+  console.log("Sample data items:", data.slice(0, 3));
+
   // Group data by date
   const dateGroups = data.reduce((acc, item) => {
+    if (!item.date) {
+      console.warn("Item missing date:", item);
+      return acc;
+    }
+
     const date = new Date(item.date);
     const dateStr = format(date, "yyyy-MM-dd");
     
@@ -54,20 +63,21 @@ export const processChartData = (
     }
     
     // Increment totals
-    acc[dateStr].totalAmount += item.amount || 0;
+    const amount = item.amount || 0;
+    acc[dateStr].totalAmount += amount;
     acc[dateStr].totalCount += 1;
     
     // Status-specific tracking
     if (item.status === "success") {
-      acc[dateStr].successAmount += item.amount || 0;
+      acc[dateStr].successAmount += amount;
       acc[dateStr].successCount += 1;
     } else if (item.status === "failure") {
-      acc[dateStr].failureAmount += item.amount || 0;
+      acc[dateStr].failureAmount += amount;
       acc[dateStr].failureCount += 1;
     }
     
     if (item.isRefunded) {
-      acc[dateStr].refundAmount += item.amount || 0;
+      acc[dateStr].refundAmount += amount;
       acc[dateStr].refundCount += 1;
     }
     
@@ -79,7 +89,7 @@ export const processChartData = (
         if (!acc[dateStr].cardTypeData[cardType]) {
           acc[dateStr].cardTypeData[cardType] = { amount: 0, count: 0 };
         }
-        acc[dateStr].cardTypeData[cardType].amount += item.amount || 0;
+        acc[dateStr].cardTypeData[cardType].amount += amount;
         acc[dateStr].cardTypeData[cardType].count += 1;
       } else if (drillDownMethod === "emi" && item.paymentMethod === "emi") {
         // Drill-down for EMI types
@@ -87,7 +97,7 @@ export const processChartData = (
         if (!acc[dateStr].emiTypeData[emiType]) {
           acc[dateStr].emiTypeData[emiType] = { amount: 0, count: 0 };
         }
-        acc[dateStr].emiTypeData[emiType].amount += item.amount || 0;
+        acc[dateStr].emiTypeData[emiType].amount += amount;
         acc[dateStr].emiTypeData[emiType].count += 1;
       } else if (!drillDownMethod) {
         // Normal method view
@@ -96,25 +106,30 @@ export const processChartData = (
           method = "cards";
         }
         
-        if (!acc[dateStr].methodData[method]) {
-          acc[dateStr].methodData[method] = { amount: 0, count: 0 };
+        if (method) {
+          if (!acc[dateStr].methodData[method]) {
+            acc[dateStr].methodData[method] = { amount: 0, count: 0 };
+          }
+          acc[dateStr].methodData[method].amount += amount;
+          acc[dateStr].methodData[method].count += 1;
         }
-        acc[dateStr].methodData[method].amount += item.amount || 0;
-        acc[dateStr].methodData[method].count += 1;
       }
     } else if (viewType === "gateway") {
       const gateway = item.paymentGateway;
-      if (gateway && !acc[dateStr].gatewayData[gateway]) {
-        acc[dateStr].gatewayData[gateway] = { amount: 0, count: 0 };
-      }
       if (gateway) {
-        acc[dateStr].gatewayData[gateway].amount += item.amount || 0;
+        if (!acc[dateStr].gatewayData[gateway]) {
+          acc[dateStr].gatewayData[gateway] = { amount: 0, count: 0 };
+        }
+        acc[dateStr].gatewayData[gateway].amount += amount;
         acc[dateStr].gatewayData[gateway].count += 1;
       }
     }
     
     return acc;
   }, {});
+  
+  console.log("Date groups after processing:", Object.keys(dateGroups));
+  console.log("Sample date group:", dateGroups[Object.keys(dateGroups)[0]]);
   
   // Convert to array and process data
   const processedData = Object.values(dateGroups)
@@ -161,6 +176,7 @@ export const processChartData = (
         } else {
           // Normal method processing
           const methods = Object.keys(processedGroup.methodData);
+          console.log("Processing methods:", methods);
           methods.forEach(method => {
             const methodData = processedGroup.methodData[method];
             if (processedGroup.totalAmount > 0) {
@@ -173,6 +189,7 @@ export const processChartData = (
         }
       } else if (viewType === "gateway") {
         const gateways = Object.keys(processedGroup.gatewayData);
+        console.log("Processing gateways:", gateways);
         gateways.forEach(gateway => {
           const gatewayData = processedGroup.gatewayData[gateway];
           if (processedGroup.totalAmount > 0) {
@@ -188,6 +205,7 @@ export const processChartData = (
     })
     .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  console.log("Processed chart data:", processedData);
+  console.log("Final processed chart data:", processedData);
+  console.log("Sample processed item:", processedData[0]);
   return processedData;
 };
