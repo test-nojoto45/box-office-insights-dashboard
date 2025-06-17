@@ -31,10 +31,9 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
   paymentStatuses = ["success", "failure"],
   paymentMethods = []
 }) => {
-  // State for drill-down functionality
+  // State for drill-down functionality (only for EMI and cards)
   const [drillDownMethod, setDrillDownMethod] = useState<string | null>(null);
 
-  // Debug logging
   console.log("PaymentStackedBarChart received data:", data);
   console.log("PaymentStackedBarChart props:", { 
     dataLength: data?.length, 
@@ -78,7 +77,7 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
     );
   }
 
-  // Handle bar click for drill-down
+  // Handle bar click for drill-down (only for EMI and cards)
   const handleBarClick = (data: any, index: number) => {
     console.log("Bar clicked:", data, index);
     if (viewType === "method" && !drillDownMethod) {
@@ -88,6 +87,7 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
       )?.replace('VolumePercent', '').replace('Count', '');
       
       console.log("Clicked method:", clickedMethod);
+      // Only allow drill-down for cards and emi
       if (clickedMethod === 'cards' || clickedMethod === 'emi') {
         setDrillDownMethod(clickedMethod);
       }
