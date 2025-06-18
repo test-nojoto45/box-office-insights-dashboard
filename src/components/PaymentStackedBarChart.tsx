@@ -9,7 +9,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Cell
 } from "recharts";
 import { Card } from "@/components/ui/card";
 import { processChartData } from "@/utils/chartDataProcessor";
@@ -78,18 +79,31 @@ const PaymentStackedBarChart: React.FC<PaymentStackedBarChartProps> = ({
   }
 
   // Handle bar click for drill-down (only for EMI and cards)
-  const handleBarClick = (data: any, index: number) => {
-    console.log("Bar clicked:", data, index);
+  const handleBarClick = (entry: any) => {
+    console.log("Bar clicked:", entry);
     if (viewType === "method" && !drillDownMethod) {
-      // Check if clicked bar is cards or emi
-      const clickedMethod = Object.keys(data).find(key => 
-        key.endsWith('VolumePercent') || key.endsWith('Count')
-      )?.replace('VolumePercent', '').replace('Count', '');
+      // Get the active dataKey from the bar that was clicked
+      const activeDataKey = entry.activeLabel || entry.dataKey;
+      console.log("Active data key:", activeDataKey);
       
-      console.log("Clicked method:", clickedMethod);
-      // Only allow drill-down for cards and emi
-      if (clickedMethod === 'cards' || clickedMethod === 'emi') {
-        setDrillDownMethod(clickedMethod);
+      // Check if we can determine the method from the chart data
+      const clickedData = entry.activePayload;
+      if (clickedData && clickedData.length > 0) {
+        // Look for cards or emi in the payload
+        const hasCards = clickedData.some((item: any) => 
+          item.dataKey && (item.dataKey.includes('cards') || item.dataKey.includes('Card'))
+        );
+        const hasEmi = clickedData.some((item: any) => 
+          item.dataKey && item.dataKey.includes('emi')
+        );
+        
+        console.log("Has cards:", hasCards, "Has emi:", hasEmi);
+        
+        if (hasCards) {
+          setDrillDownMethod('cards');
+        } else if (hasEmi) {
+          setDrillDownMethod('emi');
+        }
       }
     }
   };

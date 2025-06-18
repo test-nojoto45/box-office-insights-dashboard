@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import PaymentStackedBarChart from "@/components/PaymentStackedBarChart";
 import PaymentPieChart from "@/components/PaymentPieChart";
-import PaymentMethodSummary from "@/components/PaymentMethodSummary";
 
 interface ChartDisplayProps {
   data: any[];
@@ -90,9 +89,6 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
 
         {/* Failure Reasons Pie Chart */}
         <PaymentPieChart data={data} paymentStatuses={paymentStatuses} />
-        
-        {/* Payment Method Summary */}
-        <PaymentMethodSummary data={data} />
       </div>
     );
   }
@@ -144,9 +140,6 @@ const ChartDisplay: React.FC<ChartDisplayProps> = ({
           />
         </div>
       </Card>
-      
-      {/* Payment Method Summary */}
-      <PaymentMethodSummary data={data} />
     </div>
   );
 };
